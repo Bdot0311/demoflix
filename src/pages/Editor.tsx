@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,11 +32,17 @@ import {
   Wand2,
   Loader2,
   Shuffle,
+  Undo2,
+  Redo2,
+  Keyboard,
+  Brain,
 } from "lucide-react";
 import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
+import { KeyboardShortcutsModal } from "@/components/editor/KeyboardShortcutsModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlayback } from "@/hooks/usePlayback";
+import { useHistory } from "@/hooks/useHistory";
 import { SortableScene } from "@/components/editor/SortableScene";
 import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
@@ -63,11 +69,20 @@ interface Project {
 }
 
 const musicTracks = [
-  { id: "1", name: "Epic Cinematic", category: "Cinematic", duration: 60 },
-  { id: "2", name: "Tech Ambient", category: "Tech", duration: 45 },
-  { id: "3", name: "Hype Build", category: "Hype", duration: 30 },
-  { id: "4", name: "Soft Ambient", category: "Ambient", duration: 60 },
+  { id: "1", name: "Epic Cinematic", category: "Cinematic", artist: "TrailerScore", duration_seconds: 60 },
+  { id: "2", name: "Tech Ambient", category: "Tech", artist: "FutureSounds", duration_seconds: 45 },
+  { id: "3", name: "Hype Build", category: "Hype", artist: "DropBeats", duration_seconds: 30 },
+  { id: "4", name: "Soft Ambient", category: "Ambient", artist: "ChillWave", duration_seconds: 60 },
+  { id: "5", name: "Dramatic Tension", category: "Cinematic", artist: "OrchestraX", duration_seconds: 45 },
+  { id: "6", name: "Upbeat Corporate", category: "Corporate", artist: "BizTunes", duration_seconds: 30 },
 ];
+
+interface MusicRecommendation {
+  track_id: string;
+  track_name: string;
+  match_score: number;
+  reason: string;
+}
 
 const Editor = () => {
   const { projectId } = useParams();
@@ -85,6 +100,21 @@ const Editor = () => {
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [isRecommendingMusic, setIsRecommendingMusic] = useState(false);
+  const [musicRecommendations, setMusicRecommendations] = useState<MusicRecommendation[]>([]);
+  const [storyboardMood, setStoryboardMood] = useState<string | null>(null);
+
+  // History for undo/redo
+  const {
+    state: scenesHistory,
+    set: setSceneHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetHistory,
+  } = useHistory<Scene[]>([]);
 
   // Playback hook for real-time preview
   const handleSceneChange = useCallback((sceneId: string) => {
@@ -123,6 +153,32 @@ const Editor = () => {
         return;
       }
 
+      // Handle Ctrl/Cmd shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.code) {
+          case "KeyZ":
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Ctrl+Shift+Z: Redo
+              if (canRedo) {
+                redo();
+                toast({ title: "Redo", description: "Changes restored" });
+              }
+            } else {
+              // Ctrl+Z: Undo
+              if (canUndo) {
+                undo();
+                toast({ title: "Undo", description: "Changes reverted" });
+              }
+            }
+            return;
+          case "KeyS":
+            e.preventDefault();
+            handleSave();
+            return;
+        }
+      }
+
       switch (e.code) {
         case "Space":
           e.preventDefault();
@@ -131,10 +187,8 @@ const Editor = () => {
         case "ArrowLeft":
           e.preventDefault();
           if (e.shiftKey) {
-            // Shift + Left: Go to beginning
             seekToScene(0);
           } else {
-            // Left: Previous scene
             const prevIndex = Math.max(0, currentSceneIndex - 1);
             seekToScene(prevIndex);
           }
@@ -142,17 +196,14 @@ const Editor = () => {
         case "ArrowRight":
           e.preventDefault();
           if (e.shiftKey) {
-            // Shift + Right: Go to end
             seekToScene(scenes.length - 1);
           } else {
-            // Right: Next scene
             const nextIndex = Math.min(scenes.length - 1, currentSceneIndex + 1);
             seekToScene(nextIndex);
           }
           break;
         case "ArrowUp":
           e.preventDefault();
-          // Select previous scene (without seeking)
           if (selectedScene) {
             const currentIdx = scenes.findIndex((s) => s.id === selectedScene);
             if (currentIdx > 0) {
@@ -162,7 +213,6 @@ const Editor = () => {
           break;
         case "ArrowDown":
           e.preventDefault();
-          // Select next scene (without seeking)
           if (selectedScene) {
             const currentIdx = scenes.findIndex((s) => s.id === selectedScene);
             if (currentIdx < scenes.length - 1) {
@@ -181,6 +231,13 @@ const Editor = () => {
         case "KeyM":
           e.preventDefault();
           setIsMuted((prev) => !prev);
+          break;
+        case "Slash":
+          // ? key (Shift + /)
+          if (e.shiftKey) {
+            e.preventDefault();
+            setShowShortcutsModal(true);
+          }
           break;
         case "Digit1":
         case "Digit2":
@@ -209,7 +266,14 @@ const Editor = () => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlayback, seekToScene, currentSceneIndex, scenes, selectedScene, isPlaying]);
+  }, [togglePlayback, seekToScene, currentSceneIndex, scenes, selectedScene, isPlaying, canUndo, canRedo, undo, redo, toast]);
+
+  // Sync history state with scenes
+  useEffect(() => {
+    if (scenesHistory.length > 0) {
+      setScenes(scenesHistory);
+    }
+  }, [scenesHistory]);
 
   useEffect(() => {
     const loadProject = async () => {
@@ -258,6 +322,7 @@ const Editor = () => {
 
       if (scenesData && scenesData.length > 0) {
         setScenes(scenesData);
+        resetHistory(scenesData);
         setSelectedScene(scenesData[0]?.id || null);
       } else if (assetsData && assetsData.length > 0) {
         // Auto-generate scenes from assets
@@ -279,6 +344,7 @@ const Editor = () => {
           .select("*, asset:assets(*)");
 
         setScenes(insertedScenes || []);
+        resetHistory(insertedScenes || []);
         if (insertedScenes?.[0]) setSelectedScene(insertedScenes[0].id);
       }
 
@@ -320,9 +386,11 @@ const Editor = () => {
   const activeScene = activeId ? scenes.find((s) => s.id === activeId) : null;
 
   const updateScene = async (sceneId: string, updates: Partial<Scene>) => {
-    setScenes((prev) =>
-      prev.map((s) => (s.id === sceneId ? { ...s, ...updates } : s))
+    const newScenes = scenes.map((s) => 
+      s.id === sceneId ? { ...s, ...updates } : s
     );
+    setScenes(newScenes);
+    setSceneHistory(newScenes);
 
     await supabase.from("scenes").update(updates).eq("id", sceneId);
   };
@@ -452,6 +520,60 @@ const Editor = () => {
     }
   };
 
+  const handleRecommendMusic = async () => {
+    if (scenes.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No scenes",
+        description: "Create some scenes first to get music recommendations.",
+      });
+      return;
+    }
+
+    setIsRecommendingMusic(true);
+    try {
+      const response = await supabase.functions.invoke("recommend-music", {
+        body: {
+          scenes: scenes.map((s) => ({
+            headline: s.headline,
+            subtext: s.subtext,
+            transition: s.transition,
+          })),
+          availableTracks: musicTracks,
+          projectStyle: project?.style || "cinematic",
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to get recommendations");
+      }
+
+      const { recommendations, overall_mood } = response.data;
+      
+      setMusicRecommendations(recommendations || []);
+      setStoryboardMood(overall_mood || null);
+
+      // Auto-select the top recommendation
+      if (recommendations?.[0]?.track_id) {
+        setSelectedTrack(recommendations[0].track_id);
+      }
+
+      toast({
+        title: "Music Recommendations Ready!",
+        description: `Mood detected: ${overall_mood || "cinematic"}`,
+      });
+    } catch (error) {
+      console.error("Music recommendation error:", error);
+      toast({
+        variant: "destructive",
+        title: "Recommendation failed",
+        description: error instanceof Error ? error.message : "Failed to analyze storyboard",
+      });
+    } finally {
+      setIsRecommendingMusic(false);
+    }
+  };
+
   const selectedSceneData = scenes.find((s) => s.id === selectedScene);
 
   if (isLoading) {
@@ -482,7 +604,41 @@ const Editor = () => {
               <span className="font-semibold text-foreground">{project?.name}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Undo/Redo */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </Button>
+            
+            <div className="w-px h-6 bg-border mx-1" />
+            
+            {/* Keyboard Shortcuts */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowShortcutsModal(true)}
+              title="Keyboard Shortcuts (?)"
+            >
+              <Keyboard className="w-4 h-4" />
+            </Button>
+            
+            <div className="w-px h-6 bg-border mx-1" />
+            
             <Button 
               variant="outline" 
               onClick={handleAIGenerate} 
@@ -507,6 +663,12 @@ const Editor = () => {
           </div>
         </div>
       </nav>
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal
+        open={showShortcutsModal}
+        onOpenChange={setShowShortcutsModal}
+      />
 
       <div className="flex-1 flex">
         {/* Left Sidebar - Scene List */}
@@ -657,25 +819,73 @@ const Editor = () => {
 
               {/* Music */}
               <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Music className="w-4 h-4" />
-                  Music
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Music className="w-4 h-4" />
+                    Music
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRecommendMusic}
+                    disabled={isRecommendingMusic || scenes.length === 0}
+                    className="text-xs h-7"
+                    title="Get AI music recommendations"
+                  >
+                    {isRecommendingMusic ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Brain className="w-3 h-3 mr-1" />
+                    )}
+                    {isRecommendingMusic ? "..." : "AI Pick"}
+                  </Button>
+                </div>
+
+                {/* Mood indicator */}
+                {storyboardMood && (
+                  <div className="mb-3 px-2 py-1.5 rounded-md bg-primary/10 border border-primary/20">
+                    <div className="text-xs text-muted-foreground">Detected mood:</div>
+                    <div className="text-sm font-medium text-foreground capitalize">{storyboardMood}</div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
-                  {musicTracks.map((track) => (
-                    <button
-                      key={track.id}
-                      onClick={() => setSelectedTrack(track.id)}
-                      className={`w-full p-3 rounded-lg text-left transition-all ${
-                        selectedTrack === track.id
-                          ? "bg-primary/20 border border-primary/50"
-                          : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                      }`}
-                    >
-                      <div className="text-sm font-medium text-foreground">{track.name}</div>
-                      <div className="text-xs text-muted-foreground">{track.category}</div>
-                    </button>
-                  ))}
+                  {musicTracks.map((track) => {
+                    const recommendation = musicRecommendations.find((r) => r.track_id === track.id);
+                    const isRecommended = !!recommendation;
+                    
+                    return (
+                      <button
+                        key={track.id}
+                        onClick={() => setSelectedTrack(track.id)}
+                        className={`w-full p-3 rounded-lg text-left transition-all relative ${
+                          selectedTrack === track.id
+                            ? "bg-primary/20 border border-primary/50"
+                            : isRecommended
+                            ? "bg-accent/30 border border-accent/50 hover:bg-accent/40"
+                            : "bg-muted/30 hover:bg-muted/50 border border-transparent"
+                        }`}
+                      >
+                        {isRecommended && (
+                          <div className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium">
+                            {recommendation.match_score}%
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-foreground">{track.name}</div>
+                          {isRecommended && (
+                            <Brain className="w-3 h-3 text-accent-foreground" />
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{track.category}</div>
+                        {recommendation?.reason && (
+                          <div className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
+                            {recommendation.reason}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

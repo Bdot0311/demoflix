@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -155,6 +156,7 @@ export const TransitionSelector = ({
   onChange,
   className,
 }: TransitionSelectorProps) => {
+  const [hoveredTransition, setHoveredTransition] = useState<TransitionType | null>(null);
   const selectedOption = transitionOptions.find((opt) => opt.value === value);
 
   return (
@@ -177,7 +179,12 @@ export const TransitionSelector = ({
           {transitionOptions
             .filter((opt) => opt.category === "basic")
             .map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <SelectItem 
+                key={option.value} 
+                value={option.value}
+                onMouseEnter={() => setHoveredTransition(option.value)}
+                onMouseLeave={() => setHoveredTransition(null)}
+              >
                 <div className="flex items-center gap-2">
                   {option.icon}
                   <div>
@@ -196,7 +203,12 @@ export const TransitionSelector = ({
           {transitionOptions
             .filter((opt) => opt.category === "cinematic")
             .map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <SelectItem 
+                key={option.value} 
+                value={option.value}
+                onMouseEnter={() => setHoveredTransition(option.value)}
+                onMouseLeave={() => setHoveredTransition(null)}
+              >
                 <div className="flex items-center gap-2">
                   {option.icon}
                   <div>
@@ -215,7 +227,12 @@ export const TransitionSelector = ({
           {transitionOptions
             .filter((opt) => opt.category === "creative")
             .map((option) => (
-              <SelectItem key={option.value} value={option.value}>
+              <SelectItem 
+                key={option.value} 
+                value={option.value}
+                onMouseEnter={() => setHoveredTransition(option.value)}
+                onMouseLeave={() => setHoveredTransition(null)}
+              >
                 <div className="flex items-center gap-2">
                   {option.icon}
                   <div>
@@ -230,37 +247,158 @@ export const TransitionSelector = ({
         </SelectContent>
       </Select>
 
-      {/* Transition Preview */}
-      <TransitionPreview type={value} />
+      {/* Animated Transition Preview */}
+      <TransitionPreview 
+        type={hoveredTransition || value} 
+        isAnimating={hoveredTransition !== null}
+      />
     </div>
   );
 };
 
-const TransitionPreview = ({ type }: { type: TransitionType }) => {
+const TransitionPreview = ({ 
+  type, 
+  isAnimating 
+}: { 
+  type: TransitionType; 
+  isAnimating: boolean;
+}) => {
+  // Get animation keyframes based on transition type
+  const getAnimationStyle = (): React.CSSProperties => {
+    if (!isAnimating) return {};
+    
+    const baseAnimation = "1.2s ease-in-out infinite";
+    
+    switch (type) {
+      case "fade":
+      case "dissolve":
+        return { animation: `fadePreview ${baseAnimation}` };
+      case "slide-left":
+        return { animation: `slideLeftPreview ${baseAnimation}` };
+      case "slide-right":
+        return { animation: `slideRightPreview ${baseAnimation}` };
+      case "slide-up":
+        return { animation: `slideUpPreview ${baseAnimation}` };
+      case "slide-down":
+        return { animation: `slideDownPreview ${baseAnimation}` };
+      case "zoom-in":
+        return { animation: `zoomInPreview ${baseAnimation}` };
+      case "zoom-out":
+        return { animation: `zoomOutPreview ${baseAnimation}` };
+      case "cross-zoom":
+        return { animation: `crossZoomPreview ${baseAnimation}` };
+      case "wipe-left":
+        return { animation: `wipeLeftPreview ${baseAnimation}` };
+      case "wipe-right":
+        return { animation: `wipeRightPreview ${baseAnimation}` };
+      case "flash":
+        return { animation: `flashPreview 0.8s ease-in-out infinite` };
+      case "glitch":
+        return { animation: `glitchPreview 0.6s steps(3) infinite` };
+      case "blur":
+        return { animation: `blurPreview ${baseAnimation}` };
+      case "spin":
+        return { animation: `spinPreview ${baseAnimation}` };
+      default:
+        return {};
+    }
+  };
+
   return (
-    <div className="relative h-16 rounded-lg overflow-hidden bg-muted/50 border border-border">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          {/* Scene A */}
-          <div className="w-12 h-10 rounded bg-primary/30 border border-primary/50 flex items-center justify-center text-xs text-muted-foreground">
-            A
-          </div>
-          
-          {/* Transition Arrow */}
-          <div className="flex flex-col items-center gap-0.5">
-            <div className="text-[10px] text-muted-foreground capitalize">
-              {type.replace("-", " ")}
+    <>
+      {/* Inject keyframes */}
+      <style>{`
+        @keyframes fadePreview {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes slideLeftPreview {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(-100%); }
+        }
+        @keyframes slideRightPreview {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(100%); }
+        }
+        @keyframes slideUpPreview {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-100%); }
+        }
+        @keyframes slideDownPreview {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(100%); }
+        }
+        @keyframes zoomInPreview {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.5); opacity: 0; }
+        }
+        @keyframes zoomOutPreview {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(0.5); opacity: 0; }
+        }
+        @keyframes crossZoomPreview {
+          0%, 100% { transform: scale(1); }
+          25% { transform: scale(0.8); }
+          75% { transform: scale(1.2); }
+        }
+        @keyframes wipeLeftPreview {
+          0%, 100% { clip-path: inset(0 0 0 0); }
+          50% { clip-path: inset(0 100% 0 0); }
+        }
+        @keyframes wipeRightPreview {
+          0%, 100% { clip-path: inset(0 0 0 0); }
+          50% { clip-path: inset(0 0 0 100%); }
+        }
+        @keyframes flashPreview {
+          0%, 100% { filter: brightness(1); background: hsl(var(--primary) / 0.3); }
+          50% { filter: brightness(2); background: white; }
+        }
+        @keyframes glitchPreview {
+          0%, 100% { transform: translateX(0); filter: hue-rotate(0deg); }
+          33% { transform: translateX(-3px); filter: hue-rotate(90deg); }
+          66% { transform: translateX(3px); filter: hue-rotate(180deg); }
+        }
+        @keyframes blurPreview {
+          0%, 100% { filter: blur(0px); opacity: 1; }
+          50% { filter: blur(8px); opacity: 0.5; }
+        }
+        @keyframes spinPreview {
+          0%, 100% { transform: rotate(0deg) scale(1); opacity: 1; }
+          50% { transform: rotate(180deg) scale(0.7); opacity: 0.5; }
+        }
+      `}</style>
+      
+      <div className="relative h-16 rounded-lg overflow-hidden bg-muted/50 border border-border">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex items-center gap-2">
+            {/* Scene A - Static */}
+            <div className="w-12 h-10 rounded bg-primary/30 border border-primary/50 flex items-center justify-center text-xs text-muted-foreground">
+              A
             </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-          
-          {/* Scene B */}
-          <div className="w-12 h-10 rounded bg-secondary/30 border border-secondary/50 flex items-center justify-center text-xs text-muted-foreground">
-            B
+            
+            {/* Transition Animation Demo */}
+            <div 
+              className="w-8 h-8 rounded bg-gradient-to-r from-primary/30 to-secondary/30 border border-border flex items-center justify-center overflow-hidden"
+              style={getAnimationStyle()}
+            >
+              <ArrowRight className="w-3 h-3 text-muted-foreground" />
+            </div>
+            
+            {/* Scene B */}
+            <div className="w-12 h-10 rounded bg-secondary/30 border border-secondary/50 flex items-center justify-center text-xs text-muted-foreground">
+              B
+            </div>
           </div>
         </div>
+        
+        {/* Transition name label */}
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
+          <span className="text-[10px] text-muted-foreground capitalize px-1.5 py-0.5 bg-background/80 rounded">
+            {type.replace("-", " ")}
+          </span>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
