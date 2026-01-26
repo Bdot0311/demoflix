@@ -904,6 +904,12 @@ const Editor = () => {
               isPlaying={isPlaying}
               onTogglePlay={togglePlayback}
               fallbackAsset={assets[0]}
+              musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
+              musicVolume={musicVolume}
+              isMuted={isMuted}
+              onToggleMute={() => setIsMuted(!isMuted)}
+              currentTime={currentTime}
+              totalDuration={totalDuration}
             />
           </div>
 
