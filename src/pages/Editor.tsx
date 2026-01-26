@@ -36,6 +36,7 @@ import {
   Redo2,
   Keyboard,
   Brain,
+  Download,
 } from "lucide-react";
 import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
 import { KeyboardShortcutsModal } from "@/components/editor/KeyboardShortcutsModal";
@@ -574,6 +575,52 @@ const Editor = () => {
     }
   };
 
+  const handleExportProject = () => {
+    if (!project) return;
+
+    const exportData = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      project: {
+        name: project.name,
+        style: project.style,
+        duration: project.duration,
+        status: project.status,
+      },
+      scenes: scenes.map((scene) => ({
+        order_index: scene.order_index,
+        headline: scene.headline,
+        subtext: scene.subtext,
+        duration_ms: scene.duration_ms,
+        transition: scene.transition,
+        asset: scene.asset ? {
+          file_url: scene.asset.file_url,
+          file_type: scene.asset.file_type,
+        } : null,
+      })),
+      settings: {
+        primaryColor,
+        selectedTrack,
+        isMuted,
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Project Exported",
+      description: "Your project has been downloaded as a JSON file.",
+    });
+  };
+
   const selectedSceneData = scenes.find((s) => s.id === selectedScene);
 
   if (isLoading) {
@@ -655,6 +702,15 @@ const Editor = () => {
             <Button variant="outline" onClick={handleSave} disabled={isSaving} className="border-border">
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? "Saving..." : "Save"}
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleExportProject}
+              className="border-border"
+              title="Export project as JSON"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export
             </Button>
             <Button onClick={handleGenerate} className="bg-primary hover:bg-primary/90 glow-sm">
               <Sparkles className="w-4 h-4 mr-2" />
