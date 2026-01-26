@@ -11,6 +11,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -81,6 +83,7 @@ const Editor = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -170,8 +173,13 @@ const Editor = () => {
     loadProject();
   }, [projectId, navigate, toast]);
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
 
     if (over && active.id !== over.id) {
       const oldIndex = scenes.findIndex((s) => s.id === active.id);
@@ -193,6 +201,8 @@ const Editor = () => {
       }
     }
   };
+
+  const activeScene = activeId ? scenes.find((s) => s.id === activeId) : null;
 
   const updateScene = async (sceneId: string, updates: Partial<Scene>) => {
     setScenes((prev) =>
@@ -298,6 +308,7 @@ const Editor = () => {
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <SortableContext
@@ -316,6 +327,18 @@ const Editor = () => {
                 ))}
               </div>
             </SortableContext>
+            <DragOverlay>
+              {activeScene && (
+                <div className="p-3 rounded-xl bg-primary/30 border border-primary shadow-lg backdrop-blur-sm">
+                  <div className="text-sm font-medium text-foreground truncate">
+                    {activeScene.headline || "Scene"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {(activeScene.duration_ms / 1000).toFixed(1)}s
+                  </div>
+                </div>
+              )}
+            </DragOverlay>
           </DndContext>
         </div>
 
@@ -422,6 +445,7 @@ const Editor = () => {
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
             >
               <SortableContext
@@ -440,6 +464,15 @@ const Editor = () => {
                   ))}
                 </div>
               </SortableContext>
+              <DragOverlay>
+                {activeScene && (
+                  <div className="h-16 min-w-[80px] rounded-lg border-2 border-primary bg-primary/20 shadow-xl backdrop-blur-sm flex items-center justify-center">
+                    <span className="text-xs text-foreground font-medium px-2 truncate">
+                      {activeScene.headline || "Scene"}
+                    </span>
+                  </div>
+                )}
+              </DragOverlay>
             </DndContext>
           </div>
         </div>

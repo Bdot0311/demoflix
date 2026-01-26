@@ -29,8 +29,7 @@ export const SortableScene = ({ scene, index, isSelected, onSelect }: SortableSc
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition || "transform 200ms ease",
   };
 
   return (
@@ -42,7 +41,7 @@ export const SortableScene = ({ scene, index, isSelected, onSelect }: SortableSc
         isSelected
           ? "bg-primary/20 border border-primary/50"
           : "bg-muted/30 border border-transparent hover:bg-muted/50"
-      } ${isDragging ? "z-50 shadow-lg" : ""}`}
+      } ${isDragging ? "opacity-40 scale-95 ring-2 ring-primary/50 shadow-lg" : "hover:scale-[1.01]"}`}
     >
       <div
         {...attributes}
