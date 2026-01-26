@@ -6,13 +6,12 @@ import {
   MoreVertical, 
   Play, 
   Copy, 
-  Trash2, 
-  LogOut,
+  Trash2,
   Sparkles,
   Edit3,
   Loader2
 } from "lucide-react";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +20,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserProfileDropdown } from "@/components/UserProfileDropdown";
 
 interface Project {
   id: string;
@@ -168,7 +169,7 @@ const Dashboard = () => {
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+            <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
             <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
           <div className="flex items-center gap-4">
@@ -178,24 +179,8 @@ const Dashboard = () => {
                 New Demo
               </Button>
             </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full bg-muted">
-                  <span className="text-sm font-medium text-foreground">
-                    {user?.email?.[0]?.toUpperCase() || "U"}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-card border-border">
-                <DropdownMenuItem 
-                  onClick={handleLogout}
-                  className="text-destructive focus:text-destructive cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ThemeToggle />
+            <UserProfileDropdown user={user} />
           </div>
         </div>
       </nav>
@@ -243,7 +228,7 @@ const Dashboard = () => {
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-muted">
-                        <img src={demoflixLogo} alt="DemoFlix" className="w-16 h-auto opacity-50" />
+                        <img src={demoflixEmblem} alt="DemoFlix" className="w-16 h-auto opacity-50" />
                       </div>
                     )}
                     <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
