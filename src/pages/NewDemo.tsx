@@ -78,7 +78,7 @@ const NewDemo = () => {
           .eq("project_id", projectId)
           .order("order_index");
 
-        // Create scenes with AI-generated content
+        // Create scenes with AI-generated Netflix-style content
         const scenesToInsert = data.scenes.map((scene: any, index: number) => ({
           project_id: projectId,
           asset_id: assets?.[index]?.id || null,
@@ -86,7 +86,10 @@ const NewDemo = () => {
           headline: scene.headline || `Scene ${index + 1}`,
           subtext: scene.subtext || "",
           duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / files.length),
-          transition: "fade",
+          transition: scene.scene_type === "hook" ? "fade" : "slideLeft",
+          zoom_level: scene.zoom_level || 1.2,
+          pan_x: scene.pan_direction === "left" ? -0.1 : scene.pan_direction === "right" ? 0.1 : 0,
+          pan_y: scene.pan_direction === "up" ? -0.1 : scene.pan_direction === "down" ? 0.1 : 0,
         }));
 
         await supabase.from("scenes").insert(scenesToInsert);
