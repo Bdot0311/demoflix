@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useRef } from "react";
-import { Play, Pause, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TransitionType } from "./TransitionSelector";
 
@@ -51,11 +51,13 @@ export const PreviewPlayer = ({
   currentTime = 0,
   totalDuration = 0,
 }: PreviewPlayerProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displaySceneIndex, setDisplaySceneIndex] = useState(currentSceneIndex);
   const [prevSceneIndex, setPrevSceneIndex] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currentScene = scenes[currentSceneIndex];
   const displayScene = scenes[displaySceneIndex];
@@ -109,6 +111,53 @@ export const PreviewPlayer = ({
       }
     };
   }, [musicUrl]);
+
+  // Handle fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  // Keyboard controls for fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isFullscreen) {
+        if (e.key === "Escape") {
+          // Escape is handled by browser for fullscreen exit
+        } else if (e.key === " " || e.key === "k") {
+          e.preventDefault();
+          onTogglePlay();
+        } else if (e.key === "m") {
+          e.preventDefault();
+          onToggleMute?.();
+        } else if (e.key === "f") {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen, onTogglePlay, onToggleMute]);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+    }
+  }, []);
 
   // Handle scene transitions
   useEffect(() => {
@@ -346,7 +395,13 @@ export const PreviewPlayer = ({
   };
 
   return (
-    <div className="relative w-full max-w-4xl aspect-video rounded-xl overflow-hidden border border-border shadow-cinema bg-card">
+    <div 
+      ref={containerRef}
+      className={cn(
+        "relative w-full aspect-video rounded-xl overflow-hidden border border-border shadow-cinema bg-card",
+        isFullscreen ? "max-w-none rounded-none border-0" : "max-w-4xl"
+      )}
+    >
       {/* Background/Media Layer - Previous Scene (during transition) */}
       {(isTransitioning || (inTransitionPhase && prevSceneIndex !== null)) && prevAsset && (
         <div className="absolute inset-0 z-0">
@@ -381,7 +436,8 @@ export const PreviewPlayer = ({
           <div className="text-center p-8">
             <h2
               className={cn(
-                "text-4xl font-bold text-foreground mb-2 drop-shadow-lg transition-all duration-500",
+                "font-bold text-foreground mb-2 drop-shadow-lg transition-all duration-500",
+                isFullscreen ? "text-6xl" : "text-4xl",
                 isPlaying ? "animate-fade-in" : ""
               )}
               style={{
@@ -393,7 +449,8 @@ export const PreviewPlayer = ({
             {displayScene.subtext && (
               <p
                 className={cn(
-                  "text-xl text-foreground/80 drop-shadow transition-all duration-500 delay-100",
+                  "text-foreground/80 drop-shadow transition-all duration-500 delay-100",
+                  isFullscreen ? "text-2xl" : "text-xl",
                   isPlaying ? "animate-fade-in" : ""
                 )}
                 style={{
@@ -429,17 +486,20 @@ export const PreviewPlayer = ({
         onClick={onTogglePlay}
         className="absolute inset-0 z-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group"
       >
-        <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg">
+        <div className={cn(
+          "rounded-full bg-primary/90 flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg",
+          isFullscreen ? "w-24 h-24" : "w-16 h-16"
+        )}>
           {isPlaying ? (
-            <Pause className="w-8 h-8 text-primary-foreground" />
+            <Pause className={cn("text-primary-foreground", isFullscreen ? "w-12 h-12" : "w-8 h-8")} />
           ) : (
-            <Play className="w-8 h-8 text-primary-foreground ml-1" />
+            <Play className={cn("text-primary-foreground ml-1", isFullscreen ? "w-12 h-12" : "w-8 h-8")} />
           )}
         </div>
       </button>
 
-      {/* Scene Counter and Mute Button */}
-      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+      {/* Controls Row - Top Right */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
         {musicUrl && onToggleMute && (
           <button
             onClick={(e) => {
@@ -447,7 +507,7 @@ export const PreviewPlayer = ({
               onToggleMute();
             }}
             className="p-2 rounded-full bg-background/70 backdrop-blur-sm hover:bg-background/90 transition-colors"
-            title={isMuted ? "Unmute" : "Mute"}
+            title={isMuted ? "Unmute (M)" : "Mute (M)"}
           >
             {isMuted ? (
               <VolumeX className="w-4 h-4 text-muted-foreground" />
@@ -456,10 +516,34 @@ export const PreviewPlayer = ({
             )}
           </button>
         )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFullscreen();
+          }}
+          className="p-2 rounded-full bg-background/70 backdrop-blur-sm hover:bg-background/90 transition-colors"
+          title={isFullscreen ? "Exit Fullscreen (F)" : "Fullscreen (F)"}
+        >
+          {isFullscreen ? (
+            <Minimize className="w-4 h-4 text-foreground" />
+          ) : (
+            <Maximize className="w-4 h-4 text-foreground" />
+          )}
+        </button>
         <div className="px-3 py-1 rounded-full bg-background/70 backdrop-blur-sm text-xs text-foreground">
           Scene {currentSceneIndex + 1} / {scenes.length}
         </div>
       </div>
+
+      {/* Fullscreen Keyboard Shortcuts Hint */}
+      {isFullscreen && !isPlaying && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg bg-background/70 backdrop-blur-sm text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">Space</span> Play/Pause • 
+          <span className="font-medium text-foreground ml-2">M</span> Mute • 
+          <span className="font-medium text-foreground ml-2">F</span> Exit Fullscreen • 
+          <span className="font-medium text-foreground ml-2">Esc</span> Exit
+        </div>
+      )}
     </div>
   );
 };
