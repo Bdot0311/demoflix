@@ -14,9 +14,10 @@ import {
   Square,
   Loader2,
 } from "lucide-react";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const PreviewPage = () => {
   const { projectId } = useParams();
@@ -122,18 +123,21 @@ const PreviewPage = () => {
               </Button>
             </Link>
             <div className="flex items-center gap-3">
-              <img src={demoflixLogo} alt="DemoFlix" className="h-8 w-auto" />
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-8 w-auto" />
               <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
               <span className="text-muted-foreground">/</span>
               <span className="font-medium text-foreground">{project?.name}</span>
             </div>
           </div>
-          <Link to="/new-demo">
-            <Button variant="outline" className="border-border">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Another
-            </Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link to="/new-demo">
+              <Button variant="outline" className="border-border">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Another
+              </Button>
+            </Link>
+          </div>
         </div>
       </nav>
 

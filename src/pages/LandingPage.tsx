@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Play, Sparkles, Zap, Film, Palette, Clock, Download, ArrowRight } from "lucide-react";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LandingPage = () => {
   return (
@@ -10,10 +11,11 @@ const LandingPage = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+            <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
             <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <Link to="/login">
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 Log in
@@ -211,7 +213,7 @@ const LandingPage = () => {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
-              <img src={demoflixLogo} alt="DemoFlix" className="h-8 w-auto" />
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-8 w-auto" />
               <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
             </div>
             <p className="text-sm text-muted-foreground">

@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -48,11 +49,14 @@ const LoginPage = () => {
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 mb-12">
-            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
-            <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
-          </Link>
+          {/* Logo and Theme Toggle */}
+          <div className="flex items-center justify-between mb-12">
+            <Link to="/" className="flex items-center gap-2">
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
+              <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
+            </Link>
+            <ThemeToggle />
+          </div>
 
           <div className="animate-slide-up">
             <h1 className="text-3xl font-bold mb-2 text-foreground">Welcome back</h1>
@@ -120,7 +124,7 @@ const LoginPage = () => {
         <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-neon-cyan/10 rounded-full blur-3xl animate-float" style={{ animationDelay: "1s" }} />
         
         <div className="relative z-10 text-center max-w-md">
-          <img src={demoflixLogo} alt="DemoFlix" className="w-48 h-auto mx-auto mb-8 animate-pulse-glow" />
+          <img src={demoflixEmblem} alt="DemoFlix" className="w-48 h-auto mx-auto mb-8 animate-pulse-glow" />
           <h2 className="text-3xl font-bold mb-4 text-foreground">
             Create Cinematic Trailers
           </h2>

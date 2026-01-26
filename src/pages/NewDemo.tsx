@@ -11,10 +11,11 @@ import {
   Loader2,
   Wand2
 } from "lucide-react";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploadZone, UploadedFile } from "@/components/upload/FileUploadZone";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const trailerStyles = [
   { id: "netflix", name: "Netflix Series Intro", description: "Dramatic, bold, cinematic reveals", color: "from-red-600 to-red-900" },
@@ -200,15 +201,18 @@ const NewDemo = () => {
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+            <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
             <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
-          <Link to="/dashboard">
-            <Button variant="ghost" className="text-muted-foreground">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
+            <Link to="/dashboard">
+              <Button variant="ghost" className="text-muted-foreground">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+          </div>
         </div>
       </nav>
 

@@ -49,7 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
 import { KeyboardShortcutsModal } from "@/components/editor/KeyboardShortcutsModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +61,7 @@ import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
 import { MusicSelector } from "@/components/editor/MusicSelector";
 import { BrandingPanel } from "@/components/editor/BrandingPanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface Scene {
   id: string;
@@ -770,13 +771,14 @@ const Editor = () => {
               </Button>
             </Link>
             <div className="flex items-center gap-3">
-              <img src={demoflixLogo} alt="DemoFlix" className="h-8 w-auto" />
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-8 w-auto" />
               <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
               <span className="text-muted-foreground">/</span>
               <span className="font-medium text-foreground">{project?.name}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             {/* Undo/Redo */}
             <Button
               variant="ghost"

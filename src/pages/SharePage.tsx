@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Play, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import demoflixLogo from "@/assets/demoflix-logo.png";
+import demoflixEmblem from "@/assets/demoflix-emblem.png";
 
 const SharePage = () => {
   const { shareId } = useParams();
@@ -63,7 +63,7 @@ const SharePage = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-muted flex items-center justify-center mb-6">
-            <img src={demoflixLogo} alt="DemoFlix" className="w-12 h-auto opacity-50" />
+            <img src={demoflixEmblem} alt="DemoFlix" className="w-12 h-auto opacity-50" />
           </div>
           <h1 className="text-2xl font-bold mb-2 text-foreground">Trailer Not Found</h1>
           <p className="text-muted-foreground">
@@ -84,7 +84,7 @@ const SharePage = () => {
           {/* Header */}
           <div className="text-center mb-8 animate-fade-in">
             <div className="flex items-center justify-center gap-2 mb-4">
-              <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
               <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
             </div>
             <h1 className="text-3xl font-bold mb-2 text-foreground">{project?.name}</h1>
