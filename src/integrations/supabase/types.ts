@@ -14,7 +14,268 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assets: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string
+          file_url: string
+          id: string
+          order_index: number
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          file_url: string
+          id?: string
+          order_index?: number
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          order_index?: number
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      music_tracks: {
+        Row: {
+          artist: string | null
+          category: string
+          created_at: string
+          duration_seconds: number
+          file_url: string
+          id: string
+          name: string
+          preview_url: string | null
+        }
+        Insert: {
+          artist?: string | null
+          category: string
+          created_at?: string
+          duration_seconds: number
+          file_url: string
+          id?: string
+          name: string
+          preview_url?: string | null
+        }
+        Update: {
+          artist?: string | null
+          category?: string
+          created_at?: string
+          duration_seconds?: number
+          file_url?: string
+          id?: string
+          name?: string
+          preview_url?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration: number
+          id: string
+          name: string
+          status: string
+          style: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          name: string
+          status?: string
+          style?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          name?: string
+          status?: string
+          style?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      renders: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          progress: number
+          project_id: string
+          share_id: string | null
+          started_at: string | null
+          status: string
+          user_id: string
+          video_url: string | null
+          video_url_square: string | null
+          video_url_vertical: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          progress?: number
+          project_id: string
+          share_id?: string | null
+          started_at?: string | null
+          status?: string
+          user_id: string
+          video_url?: string | null
+          video_url_square?: string | null
+          video_url_vertical?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          progress?: number
+          project_id?: string
+          share_id?: string | null
+          started_at?: string | null
+          status?: string
+          user_id?: string
+          video_url?: string | null
+          video_url_square?: string | null
+          video_url_vertical?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scenes: {
+        Row: {
+          asset_id: string | null
+          created_at: string
+          duration_ms: number
+          headline: string | null
+          id: string
+          order_index: number
+          pan_x: number | null
+          pan_y: number | null
+          project_id: string
+          subtext: string | null
+          transition: string | null
+          updated_at: string
+          zoom_level: number | null
+        }
+        Insert: {
+          asset_id?: string | null
+          created_at?: string
+          duration_ms?: number
+          headline?: string | null
+          id?: string
+          order_index?: number
+          pan_x?: number | null
+          pan_y?: number | null
+          project_id: string
+          subtext?: string | null
+          transition?: string | null
+          updated_at?: string
+          zoom_level?: number | null
+        }
+        Update: {
+          asset_id?: string | null
+          created_at?: string
+          duration_ms?: number
+          headline?: string | null
+          id?: string
+          order_index?: number
+          pan_x?: number | null
+          pan_y?: number | null
+          project_id?: string
+          subtext?: string | null
+          transition?: string | null
+          updated_at?: string
+          zoom_level?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scenes_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -9,7 +9,8 @@ import {
   Copy, 
   Trash2, 
   LogOut,
-  Sparkles 
+  Sparkles,
+  Edit3
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -20,8 +21,18 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+interface Project {
+  id: string;
+  name: string;
+  style: string;
+  duration: number;
+  status: string;
+  thumbnail_url: string | null;
+  created_at: string;
+}
+
 const Dashboard = () => {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
@@ -35,8 +46,7 @@ const Dashboard = () => {
         return;
       }
       setUser(session.user);
-      setIsLoading(false);
-      // TODO: Load projects from database
+      loadProjects(session.user.id);
     };
 
     checkAuth();
@@ -50,12 +60,95 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const loadProjects = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error loading projects:", error);
+    } else {
+      setProjects(data || []);
+    }
+    setIsLoading(false);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
       title: "Logged out",
       description: "See you next time!",
     });
+  };
+
+  const handleDelete = async (projectId: string) => {
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete project.",
+      });
+    } else {
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      toast({
+        title: "Deleted",
+        description: "Project has been deleted.",
+      });
+    }
+  };
+
+  const handleDuplicate = async (project: Project) => {
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        name: `${project.name} (Copy)`,
+        style: project.style,
+        duration: project.duration,
+        status: "draft",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to duplicate project.",
+      });
+    } else {
+      setProjects((prev) => [data, ...prev]);
+      toast({
+        title: "Duplicated",
+        description: "Project has been duplicated.",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "bg-green-500/10 text-green-500";
+      case "rendering":
+        return "bg-yellow-500/10 text-yellow-500";
+      default:
+        return "bg-primary/10 text-primary";
+    }
   };
 
   if (isLoading) {
@@ -141,20 +234,37 @@ const Dashboard = () => {
                 className="group rounded-2xl bg-card border border-border/50 overflow-hidden hover-glow transition-all"
               >
                 {/* Thumbnail */}
-                <div className="aspect-video bg-muted relative">
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" className="rounded-full bg-primary/90">
-                      <Play className="w-5 h-5" />
-                    </Button>
+                <Link to={project.status === "completed" ? `/preview/${project.id}` : `/editor/${project.id}`}>
+                  <div className="aspect-video bg-muted relative cursor-pointer">
+                    {project.thumbnail_url ? (
+                      <img 
+                        src={project.thumbnail_url} 
+                        alt={project.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-muted">
+                        <Film className="w-12 h-12 text-primary/50" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="icon" className="rounded-full bg-primary/90">
+                        {project.status === "completed" ? (
+                          <Play className="w-5 h-5" />
+                        ) : (
+                          <Edit3 className="w-5 h-5" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </Link>
                 
                 {/* Info */}
                 <div className="p-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-semibold text-foreground mb-1">{project.name}</h3>
-                      <p className="text-sm text-muted-foreground">{project.date}</p>
+                      <p className="text-sm text-muted-foreground">{formatDate(project.created_at)}</p>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -163,11 +273,17 @@ const Dashboard = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
-                        <DropdownMenuItem className="cursor-pointer">
+                        <DropdownMenuItem 
+                          onClick={() => handleDuplicate(project)}
+                          className="cursor-pointer"
+                        >
                           <Copy className="w-4 h-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive cursor-pointer">
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(project.id)}
+                          className="text-destructive focus:text-destructive cursor-pointer"
+                        >
                           <Trash2 className="w-4 h-4 mr-2" />
                           Delete
                         </DropdownMenuItem>
@@ -175,8 +291,11 @@ const Dashboard = () => {
                     </DropdownMenu>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
+                    <span className={`px-2 py-1 text-xs rounded-full capitalize ${getStatusColor(project.status)}`}>
                       {project.status}
+                    </span>
+                    <span className="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground">
+                      {project.duration}s
                     </span>
                   </div>
                 </div>
