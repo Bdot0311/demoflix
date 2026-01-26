@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
-  Film, 
   ArrowLeft, 
   ArrowRight, 
   Check,
@@ -12,6 +11,7 @@ import {
   Loader2,
   Wand2
 } from "lucide-react";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { FileUploadZone, UploadedFile } from "@/components/upload/FileUploadZone";
@@ -200,10 +200,7 @@ const NewDemo = () => {
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center glow-sm">
-              <Film className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">DemoFlix</span>
+            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
           </Link>
           <Link to="/dashboard">
             <Button variant="ghost" className="text-muted-foreground">

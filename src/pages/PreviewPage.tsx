@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
-  Film,
   Download,
   Share2,
   Copy,
@@ -13,7 +12,9 @@ import {
   Monitor,
   Smartphone,
   Square,
+  Loader2,
 } from "lucide-react";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -103,7 +104,7 @@ const PreviewPage = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center animate-pulse-glow">
-          <Film className="w-6 h-6 text-primary" />
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       </div>
     );
@@ -121,9 +122,7 @@ const PreviewPage = () => {
               </Button>
             </Link>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Film className="w-4 h-4 text-primary-foreground" />
-              </div>
+              <img src={demoflixLogo} alt="DemoFlix" className="h-8 w-auto" />
               <span className="font-semibold text-foreground">{project?.name}</span>
             </div>
           </div>

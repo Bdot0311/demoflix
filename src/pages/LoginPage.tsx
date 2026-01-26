@@ -3,9 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Film, Mail, Lock, ArrowRight } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -49,10 +50,7 @@ const LoginPage = () => {
         <div className="w-full max-w-md">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 mb-12">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center glow-sm">
-              <Film className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">DemoFlix</span>
+            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
           </Link>
 
           <div className="animate-slide-up">
@@ -121,9 +119,7 @@ const LoginPage = () => {
         <div className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-neon-cyan/10 rounded-full blur-3xl animate-float" style={{ animationDelay: "1s" }} />
         
         <div className="relative z-10 text-center max-w-md">
-          <div className="w-32 h-32 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-8 animate-pulse-glow">
-            <Film className="w-16 h-16 text-primary" />
-          </div>
+          <img src={demoflixLogo} alt="DemoFlix" className="w-48 h-auto mx-auto mb-8 animate-pulse-glow" />
           <h2 className="text-3xl font-bold mb-4 text-foreground">
             Create Cinematic Trailers
           </h2>

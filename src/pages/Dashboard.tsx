@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
-  Film, 
   Plus, 
   MoreVertical, 
   Play, 
@@ -10,8 +9,10 @@ import {
   Trash2, 
   LogOut,
   Sparkles,
-  Edit3
+  Edit3,
+  Loader2
 } from "lucide-react";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -155,7 +156,7 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center animate-pulse-glow">
-          <Film className="w-6 h-6 text-primary" />
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       </div>
     );
@@ -167,10 +168,7 @@ const Dashboard = () => {
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center glow-sm">
-              <Film className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground">DemoFlix</span>
+            <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
           </Link>
           <div className="flex items-center gap-4">
             <Link to="/new-demo">
@@ -244,7 +242,7 @@ const Dashboard = () => {
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-muted">
-                        <Film className="w-12 h-12 text-primary/50" />
+                        <img src={demoflixLogo} alt="DemoFlix" className="w-16 h-auto opacity-50" />
                       </div>
                     )}
                     <div className="absolute inset-0 flex items-center justify-center bg-background/50 opacity-0 group-hover:opacity-100 transition-opacity">
