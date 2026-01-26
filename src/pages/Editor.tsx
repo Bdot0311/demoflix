@@ -31,7 +31,9 @@ import {
   Save,
   Wand2,
   Loader2,
+  Shuffle,
 } from "lucide-react";
+import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlayback } from "@/hooks/usePlayback";
@@ -45,6 +47,7 @@ interface Scene {
   headline: string;
   subtext: string;
   duration_ms: number;
+  transition: string;
   asset?: {
     file_url: string;
     file_type: string;
@@ -239,6 +242,7 @@ const Editor = () => {
             subtext: scene.subtext,
             duration_ms: scene.duration_ms,
             order_index: scene.order_index,
+            transition: scene.transition || "fade",
           })
           .eq("id", scene.id);
       }
@@ -519,6 +523,18 @@ const Editor = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Transition */}
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+                  <Shuffle className="w-4 h-4" />
+                  Transition
+                </h3>
+                <TransitionSelector
+                  value={(selectedSceneData.transition as TransitionType) || "fade"}
+                  onChange={(value) => updateScene(selectedSceneData.id, { transition: value })}
+                />
               </div>
 
               {/* Timing */}
