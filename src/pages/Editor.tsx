@@ -4,23 +4,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import {
   Film,
   ArrowLeft,
   Play,
   Pause,
-  GripVertical,
   Type,
   Clock,
   Music,
   Palette,
   Sparkles,
   Save,
-  Download,
   Volume2,
   VolumeX,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { SortableScene } from "@/components/editor/SortableScene";
+import { TimelineScene } from "@/components/editor/TimelineScene";
 
 interface Scene {
   id: string;
@@ -65,6 +81,17 @@ const Editor = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     const loadProject = async () => {
@@ -113,6 +140,7 @@ const Editor = () => {
 
       if (scenesData && scenesData.length > 0) {
         setScenes(scenesData);
+        setSelectedScene(scenesData[0]?.id || null);
       } else if (assetsData && assetsData.length > 0) {
         // Auto-generate scenes from assets
         const generatedScenes = assetsData.map((asset, index) => ({
@@ -133,6 +161,7 @@ const Editor = () => {
           .select("*, asset:assets(*)");
 
         setScenes(insertedScenes || []);
+        if (insertedScenes?.[0]) setSelectedScene(insertedScenes[0].id);
       }
 
       setIsLoading(false);
@@ -140,6 +169,30 @@ const Editor = () => {
 
     loadProject();
   }, [projectId, navigate, toast]);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = scenes.findIndex((s) => s.id === active.id);
+      const newIndex = scenes.findIndex((s) => s.id === over.id);
+
+      const newScenes = arrayMove(scenes, oldIndex, newIndex).map((scene, index) => ({
+        ...scene,
+        order_index: index,
+      }));
+
+      setScenes(newScenes);
+
+      // Update order in database
+      for (const scene of newScenes) {
+        await supabase
+          .from("scenes")
+          .update({ order_index: scene.order_index })
+          .eq("id", scene.id);
+      }
+    }
+  };
 
   const updateScene = async (sceneId: string, updates: Partial<Scene>) => {
     setScenes((prev) =>
@@ -240,31 +293,30 @@ const Editor = () => {
         {/* Left Sidebar - Scene List */}
         <div className="w-72 border-r border-border/50 bg-card/30 p-4 overflow-y-auto">
           <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">
-            Scenes
+            Scenes (drag to reorder)
           </h3>
-          <div className="space-y-2">
-            {scenes.map((scene, index) => (
-              <button
-                key={scene.id}
-                onClick={() => setSelectedScene(scene.id)}
-                className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
-                  selectedScene === scene.id
-                    ? "bg-primary/20 border border-primary/50"
-                    : "bg-muted/30 border border-transparent hover:bg-muted/50"
-                }`}
-              >
-                <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground truncate">
-                    {scene.headline || `Scene ${index + 1}`}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {(scene.duration_ms / 1000).toFixed(1)}s
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={scenes.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {scenes.map((scene, index) => (
+                  <SortableScene
+                    key={scene.id}
+                    scene={scene}
+                    index={index}
+                    isSelected={selectedScene === scene.id}
+                    onSelect={() => setSelectedScene(scene.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* Main Preview Area */}
@@ -367,24 +419,28 @@ const Editor = () => {
                 {(currentTime / 1000).toFixed(1)}s / {(totalDuration / 1000).toFixed(1)}s
               </div>
             </div>
-            <div className="flex gap-1 overflow-x-auto pb-2">
-              {scenes.map((scene) => (
-                <button
-                  key={scene.id}
-                  onClick={() => setSelectedScene(scene.id)}
-                  className={`flex-shrink-0 h-16 rounded-lg border-2 transition-all ${
-                    selectedScene === scene.id
-                      ? "border-primary"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                  style={{ width: `${(scene.duration_ms / totalDuration) * 100}%`, minWidth: "80px" }}
-                >
-                  <div className="h-full bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground p-2 truncate">
-                    {scene.headline || "Scene"}
-                  </div>
-                </button>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={scenes.map((s) => s.id)}
+                strategy={horizontalListSortingStrategy}
+              >
+                <div className="flex gap-1 overflow-x-auto pb-2">
+                  {scenes.map((scene) => (
+                    <TimelineScene
+                      key={scene.id}
+                      scene={scene}
+                      isSelected={selectedScene === scene.id}
+                      widthPercent={(scene.duration_ms / totalDuration) * 100}
+                      onSelect={() => setSelectedScene(scene.id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
 

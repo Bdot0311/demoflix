@@ -1,22 +1,20 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { 
   Film, 
   ArrowLeft, 
   ArrowRight, 
-  Upload, 
-  X, 
-  Image as ImageIcon, 
-  Video, 
   Check,
   Sparkles,
-  Clock
+  Clock,
+  Loader2,
+  Wand2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { FileUploadZone, UploadedFile } from "@/components/upload/FileUploadZone";
 
 const trailerStyles = [
   { id: "netflix", name: "Netflix Series Intro", description: "Dramatic, bold, cinematic reveals", color: "from-red-600 to-red-900" },
@@ -34,15 +32,6 @@ const durations = [
   { value: 60, label: "60 seconds", description: "Full product story" },
 ];
 
-interface UploadedFile {
-  id: string;
-  file: File;
-  preview: string;
-  type: "image" | "video";
-  uploading: boolean;
-  progress: number;
-}
-
 const NewDemo = () => {
   const [step, setStep] = useState(1);
   const [projectName, setProjectName] = useState("");
@@ -50,6 +39,7 @@ const NewDemo = () => {
   const [selectedStyle, setSelectedStyle] = useState("netflix");
   const [selectedDuration, setSelectedDuration] = useState(30);
   const [isCreating, setIsCreating] = useState(false);
+  const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   const [user, setUser] = useState<any>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -66,42 +56,56 @@ const NewDemo = () => {
     checkAuth();
   }, [navigate]);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []);
-    const newFiles: UploadedFile[] = selectedFiles.map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-      type: file.type.startsWith("video") ? "video" : "image",
-      uploading: false,
-      progress: 100,
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
-  }, []);
+  const generateStoryboard = async (projectId: string, assetUrls: string[]) => {
+    setIsGeneratingStoryboard(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-storyboard", {
+        body: {
+          imageUrls: assetUrls,
+          style: selectedStyle,
+          duration: selectedDuration,
+          assetCount: files.length,
+        },
+      });
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    const validFiles = droppedFiles.filter(
-      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
-    );
-    const newFiles: UploadedFile[] = validFiles.map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      preview: URL.createObjectURL(file),
-      type: file.type.startsWith("video") ? "video" : "image",
-      uploading: false,
-      progress: 100,
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
-  }, []);
+      if (error) throw error;
 
-  const removeFile = (id: string) => {
-    setFiles((prev) => {
-      const file = prev.find((f) => f.id === id);
-      if (file) URL.revokeObjectURL(file.preview);
-      return prev.filter((f) => f.id !== id);
-    });
+      if (data?.scenes && Array.isArray(data.scenes)) {
+        // Get assets to link with scenes
+        const { data: assets } = await supabase
+          .from("assets")
+          .select("id")
+          .eq("project_id", projectId)
+          .order("order_index");
+
+        // Create scenes with AI-generated content
+        const scenesToInsert = data.scenes.map((scene: any, index: number) => ({
+          project_id: projectId,
+          asset_id: assets?.[index]?.id || null,
+          order_index: scene.order_index || index,
+          headline: scene.headline || `Scene ${index + 1}`,
+          subtext: scene.subtext || "",
+          duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / files.length),
+          transition: "fade",
+        }));
+
+        await supabase.from("scenes").insert(scenesToInsert);
+
+        toast({
+          title: "AI Storyboard Generated!",
+          description: "Your trailer scenes have been created automatically.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Storyboard generation error:", error);
+      toast({
+        variant: "destructive",
+        title: "AI Generation Failed",
+        description: "Using default scene structure instead.",
+      });
+    } finally {
+      setIsGeneratingStoryboard(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -124,6 +128,8 @@ const NewDemo = () => {
 
       if (projectError) throw projectError;
 
+      const assetUrls: string[] = [];
+
       // Upload files to storage and create asset records
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -142,6 +148,8 @@ const NewDemo = () => {
           .from("project-assets")
           .getPublicUrl(filePath);
 
+        assetUrls.push(publicUrl);
+
         await supabase.from("assets").insert({
           project_id: project.id,
           user_id: user.id,
@@ -152,6 +160,9 @@ const NewDemo = () => {
           order_index: i,
         });
       }
+
+      // Generate AI storyboard
+      await generateStoryboard(project.id, assetUrls);
 
       toast({
         title: "Project created!",
@@ -171,12 +182,14 @@ const NewDemo = () => {
   };
 
   const canProceed = () => {
-    if (step === 1) return files.length > 0;
+    if (step === 1) return files.length > 0 && !files.some((f) => f.uploading);
     if (step === 2) return selectedStyle !== "";
     if (step === 3) return selectedDuration > 0;
     if (step === 4) return projectName.trim() !== "";
     return false;
   };
+
+  const isProcessing = isCreating || isGeneratingStoryboard;
 
   return (
     <div className="min-h-screen bg-background">
@@ -244,80 +257,7 @@ const NewDemo = () => {
                   Add screenshots, images, or videos of your product
                 </p>
               </div>
-
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-border rounded-2xl p-12 text-center hover:border-primary/50 transition-colors cursor-pointer"
-              >
-                <input
-                  type="file"
-                  id="file-upload"
-                  className="hidden"
-                  multiple
-                  accept="image/*,video/*"
-                  onChange={handleFileSelect}
-                />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                    <Upload className="w-10 h-10 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2 text-foreground">
-                    Drag & drop files here
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    or click to browse
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Supports PNG, JPG, MP4, MOV
-                  </p>
-                </label>
-              </div>
-
-              {files.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">
-                    Uploaded Files ({files.length})
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {files.map((file) => (
-                      <div
-                        key={file.id}
-                        className="relative group rounded-xl overflow-hidden border border-border bg-card"
-                      >
-                        {file.type === "image" ? (
-                          <img
-                            src={file.preview}
-                            alt={file.file.name}
-                            className="w-full aspect-video object-cover"
-                          />
-                        ) : (
-                          <video
-                            src={file.preview}
-                            className="w-full aspect-video object-cover"
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Button
-                            size="icon"
-                            variant="destructive"
-                            onClick={() => removeFile(file.id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <div className="absolute bottom-2 left-2">
-                          {file.type === "image" ? (
-                            <ImageIcon className="w-4 h-4 text-foreground" />
-                          ) : (
-                            <Video className="w-4 h-4 text-foreground" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <FileUploadZone files={files} setFiles={setFiles} maxFiles={20} />
             </div>
           )}
 
@@ -438,6 +378,19 @@ const NewDemo = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* AI Feature Callout */}
+                <div className="mt-6 p-4 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                    <Wand2 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">AI-Powered Storyboard</p>
+                    <p className="text-xs text-muted-foreground">
+                      AI will analyze your assets and generate headlines automatically
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -447,7 +400,7 @@ const NewDemo = () => {
             <Button
               variant="outline"
               onClick={() => setStep((s) => s - 1)}
-              disabled={step === 1}
+              disabled={step === 1 || isProcessing}
               className="border-border"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -466,11 +419,14 @@ const NewDemo = () => {
             ) : (
               <Button
                 onClick={handleCreate}
-                disabled={!canProceed() || isCreating}
+                disabled={!canProceed() || isProcessing}
                 className="bg-primary hover:bg-primary/90 glow"
               >
-                {isCreating ? (
-                  "Creating..."
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isGeneratingStoryboard ? "Generating Storyboard..." : "Creating..."}
+                  </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4 mr-2" />
