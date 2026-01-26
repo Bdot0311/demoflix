@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
-import { Play, Pause } from "lucide-react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TransitionType } from "./TransitionSelector";
 
@@ -25,6 +25,12 @@ interface PreviewPlayerProps {
     file_url: string;
     file_type: string;
   };
+  musicUrl?: string;
+  musicVolume?: number;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  currentTime?: number;
+  totalDuration?: number;
 }
 
 // Transition duration in ms (for animation timing)
@@ -38,7 +44,15 @@ export const PreviewPlayer = ({
   isPlaying,
   onTogglePlay,
   fallbackAsset,
+  musicUrl,
+  musicVolume = 80,
+  isMuted = false,
+  onToggleMute,
+  currentTime = 0,
+  totalDuration = 0,
 }: PreviewPlayerProps) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displaySceneIndex, setDisplaySceneIndex] = useState(currentSceneIndex);
   const [prevSceneIndex, setPrevSceneIndex] = useState<number | null>(null);
@@ -52,6 +66,49 @@ export const PreviewPlayer = ({
   const transitionProgress = inTransitionPhase 
     ? currentSceneProgress / TRANSITION_THRESHOLD 
     : 1;
+
+  // Sync music with playback
+  useEffect(() => {
+    if (!musicUrl) return;
+
+    // Create audio element if needed
+    if (!audioRef.current) {
+      audioRef.current = new Audio(musicUrl);
+      audioRef.current.loop = true;
+    }
+
+    const audio = audioRef.current;
+    
+    // Update volume
+    audio.volume = isMuted ? 0 : musicVolume / 100;
+
+    if (isPlaying) {
+      // Sync position if drifted more than 500ms
+      const audioTime = audio.currentTime * 1000;
+      const drift = Math.abs(audioTime - currentTime);
+      if (drift > 500 || Math.abs(currentTime - lastSyncTimeRef.current) > 1000) {
+        audio.currentTime = currentTime / 1000;
+        lastSyncTimeRef.current = currentTime;
+      }
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+
+    return () => {
+      // Cleanup on unmount
+    };
+  }, [musicUrl, isPlaying, currentTime, musicVolume, isMuted]);
+
+  // Cleanup audio on unmount or music change
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [musicUrl]);
 
   // Handle scene transitions
   useEffect(() => {
@@ -381,9 +438,27 @@ export const PreviewPlayer = ({
         </div>
       </button>
 
-      {/* Scene Counter */}
-      <div className="absolute top-4 right-4 z-30 px-3 py-1 rounded-full bg-background/70 backdrop-blur-sm text-xs text-foreground">
-        Scene {currentSceneIndex + 1} / {scenes.length}
+      {/* Scene Counter and Mute Button */}
+      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+        {musicUrl && onToggleMute && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMute();
+            }}
+            className="p-2 rounded-full bg-background/70 backdrop-blur-sm hover:bg-background/90 transition-colors"
+            title={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-foreground" />
+            )}
+          </button>
+        )}
+        <div className="px-3 py-1 rounded-full bg-background/70 backdrop-blur-sm text-xs text-foreground">
+          Scene {currentSceneIndex + 1} / {scenes.length}
+        </div>
       </div>
     </div>
   );
