@@ -85,6 +85,7 @@ const SharePage = () => {
           <div className="text-center mb-8 animate-fade-in">
             <div className="flex items-center justify-center gap-2 mb-4">
               <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+              <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
             </div>
             <h1 className="text-3xl font-bold mb-2 text-foreground">{project?.name}</h1>
             <p className="text-muted-foreground">
