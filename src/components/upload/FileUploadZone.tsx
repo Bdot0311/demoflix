@@ -1,7 +1,10 @@
 import { useCallback, useState } from "react";
-import { Upload, X, Image as ImageIcon, Video, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Video, Loader2, Link, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export interface UploadedFile {
   id: string;
@@ -11,6 +14,7 @@ export interface UploadedFile {
   uploading: boolean;
   progress: number;
   uploaded: boolean;
+  sourceUrl?: string; // Track if this came from a URL scrape
 }
 
 interface FileUploadZoneProps {
@@ -21,8 +25,11 @@ interface FileUploadZoneProps {
 
 export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZoneProps) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [isScrapingUrl, setIsScrapingUrl] = useState(false);
+  const { toast } = useToast();
 
-  const addFiles = useCallback((newFiles: File[]) => {
+  const addFiles = useCallback((newFiles: File[], sourceUrl?: string) => {
     const validFiles = newFiles
       .filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"))
       .slice(0, maxFiles - files.length);
@@ -35,6 +42,7 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
       uploading: true,
       progress: 0,
       uploaded: false,
+      sourceUrl,
     }));
 
     setFiles((prev) => [...prev, ...uploadedFiles]);
@@ -90,8 +98,130 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
     setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const url = urlInput.trim();
+    if (!url) return;
+
+    // Basic URL validation
+    let formattedUrl = url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      formattedUrl = `https://${url}`;
+    }
+
+    try {
+      new URL(formattedUrl);
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Invalid URL",
+        description: "Please enter a valid website URL",
+      });
+      return;
+    }
+
+    if (files.length >= maxFiles) {
+      toast({
+        variant: "destructive",
+        title: "Maximum files reached",
+        description: `You can only upload up to ${maxFiles} files`,
+      });
+      return;
+    }
+
+    setIsScrapingUrl(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-website', {
+        body: { url: formattedUrl },
+      });
+
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to scrape website');
+      }
+
+      // Convert base64 screenshot to File
+      const base64Data = data.screenshot;
+      const byteString = atob(base64Data);
+      const mimeType = 'image/png';
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeType });
+      
+      // Create filename from URL
+      const hostname = new URL(formattedUrl).hostname.replace(/[^a-z0-9]/gi, '-');
+      const filename = `${hostname}-screenshot.png`;
+      const file = new File([blob], filename, { type: mimeType });
+
+      addFiles([file], formattedUrl);
+      setUrlInput("");
+
+      toast({
+        title: "Website captured!",
+        description: `Screenshot of ${data.metadata?.title || formattedUrl} added`,
+      });
+    } catch (error: any) {
+      console.error('Error scraping URL:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to capture website",
+        description: error.message || "Could not take screenshot of the website",
+      });
+    } finally {
+      setIsScrapingUrl(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* URL Input */}
+      <div className="space-y-2">
+        <form onSubmit={handleUrlSubmit} className="flex gap-2">
+          <div className="relative flex-1">
+            <Link className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Paste a website URL to capture a screenshot..."
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="pl-10"
+              disabled={isScrapingUrl}
+            />
+          </div>
+          <Button type="submit" disabled={isScrapingUrl || !urlInput.trim()}>
+            {isScrapingUrl ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Capturing...
+              </>
+            ) : (
+              <>
+                <Globe className="w-4 h-4 mr-2" />
+                Capture
+              </>
+            )}
+          </Button>
+        </form>
+        <p className="text-xs text-muted-foreground">
+          Enter any website URL to capture a screenshot for your video
+        </p>
+      </div>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or upload files</span>
+        </div>
+      </div>
+
       {/* Drop Zone */}
       <div
         onDragOver={handleDragOver}
@@ -184,7 +314,9 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
 
                 {/* File Type Icon */}
                 <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                  {file.type === "image" ? (
+                  {file.sourceUrl ? (
+                    <Globe className="w-4 h-4 text-foreground drop-shadow" />
+                  ) : file.type === "image" ? (
                     <ImageIcon className="w-4 h-4 text-foreground drop-shadow" />
                   ) : (
                     <Video className="w-4 h-4 text-foreground drop-shadow" />
@@ -193,6 +325,15 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
                     <span className="w-2 h-2 rounded-full bg-primary" />
                   )}
                 </div>
+
+                {/* Source URL indicator */}
+                {file.sourceUrl && (
+                  <div className="absolute top-2 left-2 right-2">
+                    <div className="bg-background/90 rounded px-2 py-1 text-xs truncate text-muted-foreground">
+                      {new URL(file.sourceUrl).hostname}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
