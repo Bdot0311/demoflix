@@ -11,6 +11,8 @@ interface SceneData {
   subtext: string;
   duration_ms: number;
   scene_type: string;
+  zoom_level: number;
+  pan_direction: string;
 }
 
 serve(async (req) => {
@@ -26,61 +28,78 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const styleDescriptions: Record<string, string> = {
-      netflix: "dramatic, bold, cinematic with suspenseful reveals and powerful statements",
-      startup: "energetic, modern, growth-focused with dynamic momentum",
-      futuristic: "sleek, tech-forward, innovative with cutting-edge vibes",
-      apple: "minimal, elegant, premium with clean sophistication",
-      cyber: "edgy, powerful, mysterious with dark intensity",
-      growth: "high-energy, conversion-focused with bold sales messaging",
-    };
-
-    const styleContext = styleDescriptions[style] || styleDescriptions.netflix;
+    // Calculate scene duration with room for transitions
     const sceneDuration = Math.floor((duration * 1000) / assetCount);
 
-    // Build content array with images
-    const content: any[] = [
-      {
-        type: "text",
-        text: `You are a creative director for cinematic product trailers. Analyze these ${assetCount} product screenshots/images and create a storyboard for a ${duration}-second trailer.
+    // Netflix-style trailer system prompt
+    const systemPrompt = `You are a world-class film trailer editor who creates viral Netflix-style product trailers. Your trailers are:
 
-Style: ${style} - ${styleContext}
+- DRAMATIC: Every word hits like a punch. Short. Powerful. Unforgettable.
+- CINEMATIC: Think movie trailer, not corporate video. Build tension, then release.
+- EMOTIONAL: Connect with viewers' desires, fears, and aspirations.
+- RHYTHMIC: Perfect pacing that keeps viewers glued to the screen.
 
-For each of the ${assetCount} scenes, generate:
-1. A punchy headline (3-6 words) that creates impact
-2. A brief subtext (5-10 words) that adds context
-3. The scene type (hook, feature, benefit, momentum, cta)
+Your signature style:
+- Headlines are 2-5 words MAX. No fluff. Pure impact.
+- Use power words: Revolutionary, Unleash, Dominate, Transform, Unstoppable
+- Create a narrative arc: Hook → Build tension → Reveal → Call to action
+- Each scene should make viewers FEEL something`;
 
-The trailer structure should follow:
-- Scene 1: Hook - A bold opening statement or problem
-- Middle scenes: Feature reveals and benefits
-- Last scene: Strong CTA or closing statement
+    const userPrompt = `Create a ${duration}-second Netflix-style cinematic trailer storyboard for these ${assetCount} product screenshots.
 
-Return ONLY a JSON array with exactly ${assetCount} objects. Each object must have:
-{
-  "order_index": number (0-based),
-  "headline": string,
-  "subtext": string,
-  "duration_ms": ${sceneDuration},
-  "scene_type": string
-}
+TRAILER STRUCTURE:
+- Scene 1 (HOOK): Open with intrigue. Make them stop scrolling. Dark, mysterious, powerful.
+- Scenes 2-${assetCount - 1} (BUILD): Rapid-fire feature reveals with escalating intensity. Each scene more impressive than the last.
+- Scene ${assetCount} (CLIMAX/CTA): Epic finale with unforgettable call to action.
 
-Example headlines by style:
-- Netflix: "The Future Awaits", "Beyond Limits", "Witness the Revolution"
-- Startup: "Built for Scale", "Your Workflow. Supercharged.", "Growth Unleashed"
-- Apple: "Simplicity. Perfected.", "Designed with Intent", "Pure. Powerful."
-- Cyber: "Enter the Grid", "Hack Your Workflow", "Digital Dominance"
-- Growth: "10X Your Results", "Explode Your Revenue", "Unstoppable Growth"`,
-      },
-    ];
+FOR EACH SCENE, provide:
+1. headline: 2-5 word power statement (ALL CAPS style energy)
+2. subtext: 6-12 word supporting line (optional, can be empty for pure visual impact)
+3. scene_type: "hook", "tension", "reveal", "feature", "benefit", "climax", or "cta"
+4. zoom_level: 1.0-1.4 (subtle zoom for Ken Burns effect)
+5. pan_direction: "left", "right", "up", "down", or "center"
 
-    // Add images to the content if provided
+HEADLINE EXAMPLES (study the energy):
+- "THE FUTURE ARRIVES"
+- "EVERYTHING CHANGES"
+- "WITNESS POWER"
+- "BEYOND LIMITS"
+- "ONE TOOL. INFINITE POSSIBILITIES."
+- "YOUR COMPETITION WON'T SEE IT COMING"
+- "THIS CHANGES EVERYTHING"
+
+SUBTEXT EXAMPLES:
+- "" (empty for dramatic pause)
+- "Built for those who refuse to settle"
+- "Where innovation meets execution"
+- "The revolution starts now"
+
+Return ONLY a valid JSON array with exactly ${assetCount} objects:
+[
+  {
+    "order_index": 0,
+    "headline": "THE GAME HAS CHANGED",
+    "subtext": "",
+    "duration_ms": ${sceneDuration},
+    "scene_type": "hook",
+    "zoom_level": 1.3,
+    "pan_direction": "center"
+  }
+]`;
+
+    // Build content array with images for visual analysis
+    const content: any[] = [{ type: "text", text: userPrompt }];
+
+    // Add images to analyze (limit to 10)
     if (imageUrls && imageUrls.length > 0) {
       for (const url of imageUrls.slice(0, 10)) {
-        content.push({
-          type: "image_url",
-          image_url: { url },
-        });
+        // Only add image URLs that look like valid image formats
+        if (url.match(/\.(jpg|jpeg|png|gif|webp)/i)) {
+          content.push({
+            type: "image_url",
+            image_url: { url },
+          });
+        }
       }
     }
 
@@ -93,10 +112,8 @@ Example headlines by style:
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          {
-            role: "user",
-            content,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content },
         ],
       }),
     });
@@ -124,25 +141,80 @@ Example headlines by style:
     const data = await response.json();
     const content_text = data.choices?.[0]?.message?.content || "";
 
+    console.log("AI Response:", content_text);
+
     // Extract JSON from the response
     let scenes: SceneData[] = [];
     try {
-      // Try to parse the entire response as JSON
       const jsonMatch = content_text.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         scenes = JSON.parse(jsonMatch[0]);
       }
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
-      // Generate fallback scenes
-      scenes = Array.from({ length: assetCount }, (_, i) => ({
-        order_index: i,
-        headline: i === 0 ? "Introducing..." : i === assetCount - 1 ? "Get Started Today" : `Feature ${i}`,
-        subtext: i === 0 ? "The future of your workflow" : "",
-        duration_ms: sceneDuration,
-        scene_type: i === 0 ? "hook" : i === assetCount - 1 ? "cta" : "feature",
-      }));
     }
+
+    // Validate and ensure we have the right number of scenes
+    if (!scenes || scenes.length !== assetCount) {
+      console.log("Generating fallback Netflix-style scenes");
+      // Generate compelling fallback scenes
+      const fallbackHeadlines = [
+        { headline: "THE FUTURE IS HERE", subtext: "", type: "hook", zoom: 1.3, pan: "center" },
+        { headline: "POWER UNLEASHED", subtext: "Built for those who demand more", type: "feature", zoom: 1.2, pan: "right" },
+        { headline: "BEYOND LIMITS", subtext: "Where innovation meets execution", type: "reveal", zoom: 1.15, pan: "left" },
+        { headline: "UNSTOPPABLE", subtext: "Nothing can hold you back", type: "benefit", zoom: 1.25, pan: "up" },
+        { headline: "DOMINATE", subtext: "Your competition won't know what hit them", type: "tension", zoom: 1.2, pan: "down" },
+        { headline: "REVOLUTIONARY", subtext: "This changes everything", type: "climax", zoom: 1.35, pan: "center" },
+        { headline: "START NOW", subtext: "The revolution begins today", type: "cta", zoom: 1.1, pan: "center" },
+      ];
+
+      scenes = Array.from({ length: assetCount }, (_, i) => {
+        const fallback = fallbackHeadlines[Math.min(i, fallbackHeadlines.length - 1)];
+        // First scene is always hook, last is always CTA
+        if (i === 0) {
+          return {
+            order_index: i,
+            headline: "THE FUTURE IS HERE",
+            subtext: "",
+            duration_ms: sceneDuration,
+            scene_type: "hook",
+            zoom_level: 1.3,
+            pan_direction: "center",
+          };
+        }
+        if (i === assetCount - 1) {
+          return {
+            order_index: i,
+            headline: "START NOW",
+            subtext: "Join the revolution today",
+            duration_ms: sceneDuration,
+            scene_type: "cta",
+            zoom_level: 1.1,
+            pan_direction: "center",
+          };
+        }
+        return {
+          order_index: i,
+          headline: fallback.headline,
+          subtext: fallback.subtext,
+          duration_ms: sceneDuration,
+          scene_type: fallback.type,
+          zoom_level: fallback.zoom,
+          pan_direction: fallback.pan,
+        };
+      });
+    }
+
+    // Ensure all scenes have required fields
+    scenes = scenes.map((scene, i) => ({
+      order_index: scene.order_index ?? i,
+      headline: scene.headline || "POWER",
+      subtext: scene.subtext || "",
+      duration_ms: scene.duration_ms || sceneDuration,
+      scene_type: scene.scene_type || "feature",
+      zoom_level: scene.zoom_level || 1.2,
+      pan_direction: scene.pan_direction || "center",
+    }));
 
     return new Response(
       JSON.stringify({ scenes }),

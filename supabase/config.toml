@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.scrape-website]
 verify_jwt = false
+
+[functions.render-video]
+verify_jwt = false
+
+[functions.check-render-status]
+verify_jwt = false
