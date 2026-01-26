@@ -60,6 +60,7 @@ import { SortableScene } from "@/components/editor/SortableScene";
 import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
 import { MusicSelector } from "@/components/editor/MusicSelector";
+import { BrandingPanel } from "@/components/editor/BrandingPanel";
 
 interface Scene {
   id: string;
@@ -81,7 +82,13 @@ interface Project {
   duration: number;
   status: string;
   selected_music_track: string | null;
-  music_volume: number;
+  music_volume: number | null;
+  logo_url: string | null;
+  brand_color: string | null;
+  brand_color_secondary: string | null;
+  logo_position: string | null;
+  logo_size: string | null;
+  show_logo_on_all_scenes: boolean | null;
 }
 
 interface MusicTrack {
@@ -129,7 +136,7 @@ const Editor = () => {
   const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState("#ef4444");
+  
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
@@ -655,6 +662,29 @@ const Editor = () => {
     }
   };
 
+  const handleBrandingUpdate = async (updates: Partial<{
+    logo_url: string | null;
+    brand_color: string;
+    brand_color_secondary: string;
+    logo_position: string;
+    logo_size: string;
+    show_logo_on_all_scenes: boolean;
+  }>) => {
+    if (!projectId || !project) return;
+
+    // Update local state
+    setProject({
+      ...project,
+      ...updates,
+    } as Project);
+
+    // Save to database
+    await supabase
+      .from("projects")
+      .update(updates)
+      .eq("id", projectId);
+  };
+
   type ExportFormat = {
     id: string;
     name: string;
@@ -1017,25 +1047,22 @@ const Editor = () => {
                 disabled={scenes.length === 0}
               />
 
-              {/* Brand Colors */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Palette className="w-4 h-4" />
-                  Brand Color
-                </h3>
-                <div className="flex gap-2">
-                  {["#ef4444", "#3b82f6", "#22c55e", "#a855f7", "#f59e0b"].map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setPrimaryColor(color)}
-                      className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                        primaryColor === color ? "border-foreground scale-110" : "border-transparent"
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
+              {/* Branding */}
+              {project && (
+                <BrandingPanel
+                  projectId={project.id}
+                  settings={{
+                    logo_url: project.logo_url,
+                    brand_color: project.brand_color || "#E50914",
+                    brand_color_secondary: project.brand_color_secondary || "#141414",
+                    logo_position: (project.logo_position as any) || "bottom-right",
+                    logo_size: (project.logo_size as any) || "medium",
+                    show_logo_on_all_scenes: project.show_logo_on_all_scenes || false,
+                  }}
+                  onUpdate={handleBrandingUpdate}
+                  disabled={scenes.length === 0}
+                />
+              )}
             </div>
           ) : (
             <div className="text-center text-muted-foreground py-12">

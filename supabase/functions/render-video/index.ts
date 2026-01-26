@@ -62,6 +62,15 @@ const getTextStyle = (sceneType: string, sceneIndex: number, totalScenes: number
   };
 };
 
+interface BrandingOptions {
+  logo_url?: string | null;
+  brand_color?: string | null;
+  brand_color_secondary?: string | null;
+  logo_position?: string | null;
+  logo_size?: string | null;
+  show_logo_on_all_scenes?: boolean | null;
+}
+
 // Build Shotstack timeline for Netflix-style trailer
 function buildShotstackTimeline(
   scenes: Scene[],
@@ -69,7 +78,8 @@ function buildShotstackTimeline(
   style: string,
   outputFormat: "16:9" | "9:16" | "1:1" = "16:9",
   musicUrl?: string,
-  musicVolume: number = 80
+  musicVolume: number = 80,
+  branding?: BrandingOptions
 ) {
   const assetMap = new Map(assets.map((a) => [a.id, a]));
   const tracks: any[] = [];
@@ -78,6 +88,7 @@ function buildShotstackTimeline(
   // Background track with scenes
   const backgroundClips: any[] = [];
   const textClips: any[] = [];
+  const logoClips: any[] = [];
   const overlayClips: any[] = [];
 
   for (let i = 0; i < scenes.length; i++) {
@@ -193,6 +204,75 @@ function buildShotstackTimeline(
   tracks.push({ clips: backgroundClips }); // Background images/videos
   tracks.push({ clips: overlayClips }); // Vignette overlay
   tracks.push({ clips: textClips }); // Text on top
+
+  // Add logo overlay if provided
+  if (branding?.logo_url) {
+    const totalDuration = scenes.reduce((sum, s) => sum + s.duration_ms / 1000, 0);
+    
+    // Calculate logo position
+    const positionMap: Record<string, { x: number; y: number }> = {
+      "top-left": { x: -0.4, y: -0.4 },
+      "top-right": { x: 0.4, y: -0.4 },
+      "bottom-left": { x: -0.4, y: 0.4 },
+      "bottom-right": { x: 0.4, y: 0.4 },
+      "center": { x: 0, y: 0 },
+    };
+    
+    // Calculate logo scale based on size
+    const sizeMap: Record<string, number> = {
+      "small": 0.1,
+      "medium": 0.15,
+      "large": 0.2,
+    };
+    
+    const position = positionMap[branding.logo_position || "bottom-right"] || positionMap["bottom-right"];
+    const scale = sizeMap[branding.logo_size || "medium"] || 0.15;
+
+    if (branding.show_logo_on_all_scenes) {
+      // Show logo throughout entire video
+      logoClips.push({
+        asset: {
+          type: "image",
+          src: branding.logo_url,
+        },
+        start: 0,
+        length: totalDuration,
+        fit: "none",
+        scale: scale,
+        position: "center",
+        offset: position,
+        opacity: 0.9,
+        transition: {
+          in: "fade",
+          out: "fade",
+        },
+      });
+    } else {
+      // Show logo only on last scene
+      const lastSceneDuration = scenes[scenes.length - 1]?.duration_ms / 1000 || 3;
+      const lastSceneStart = totalDuration - lastSceneDuration;
+      
+      logoClips.push({
+        asset: {
+          type: "image",
+          src: branding.logo_url,
+        },
+        start: lastSceneStart + 0.5, // Fade in slightly after scene starts
+        length: lastSceneDuration - 0.5,
+        fit: "none",
+        scale: scale,
+        position: "center",
+        offset: position,
+        opacity: 0.9,
+        transition: {
+          in: "fade",
+          out: "fade",
+        },
+      });
+    }
+    
+    tracks.push({ clips: logoClips });
+  }
 
   // Add background music track if provided
   if (musicUrl) {
@@ -324,20 +404,31 @@ serve(async (req) => {
       }
     }
 
+    // Extract branding options
+    const branding: BrandingOptions = {
+      logo_url: project.logo_url,
+      brand_color: project.brand_color,
+      brand_color_secondary: project.brand_color_secondary,
+      logo_position: project.logo_position,
+      logo_size: project.logo_size,
+      show_logo_on_all_scenes: project.show_logo_on_all_scenes,
+    };
+
     // Update render status to processing
     await supabase
       .from("renders")
       .update({ status: "processing", started_at: new Date().toISOString() })
       .eq("id", renderId);
 
-    // Build Shotstack timeline with music
+    // Build Shotstack timeline with music and branding
     const shotstackPayload = buildShotstackTimeline(
       scenes as Scene[],
       (assets || []) as Asset[],
       project.style || "netflix",
       "16:9",
       musicUrl,
-      musicVolume
+      musicVolume,
+      branding
     );
 
     console.log("Submitting to Shotstack:", JSON.stringify(shotstackPayload, null, 2));
@@ -374,19 +465,25 @@ serve(async (req) => {
       horizontal: shotstackData.response?.id,
     };
 
-    // Also queue vertical and square renders
+    // Also queue vertical and square renders with branding
     const verticalPayload = buildShotstackTimeline(
       scenes as Scene[],
       (assets || []) as Asset[],
       project.style || "netflix",
-      "9:16"
+      "9:16",
+      musicUrl,
+      musicVolume,
+      branding
     );
     
     const squarePayload = buildShotstackTimeline(
       scenes as Scene[],
       (assets || []) as Asset[],
       project.style || "netflix",
-      "1:1"
+      "1:1",
+      musicUrl,
+      musicVolume,
+      branding
     );
 
     const [verticalRes, squareRes] = await Promise.all([
