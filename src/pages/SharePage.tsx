@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Film, Play, Download } from "lucide-react";
+import { Play, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 
 const SharePage = () => {
   const { shareId } = useParams();
@@ -51,7 +52,7 @@ const SharePage = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center animate-pulse-glow">
-          <Film className="w-6 h-6 text-primary" />
+          <Loader2 className="w-6 h-6 text-primary animate-spin" />
         </div>
       </div>
     );
@@ -62,7 +63,7 @@ const SharePage = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-20 h-20 mx-auto rounded-2xl bg-muted flex items-center justify-center mb-6">
-            <Film className="w-10 h-10 text-muted-foreground" />
+            <img src={demoflixLogo} alt="DemoFlix" className="w-12 h-auto opacity-50" />
           </div>
           <h1 className="text-2xl font-bold mb-2 text-foreground">Trailer Not Found</h1>
           <p className="text-muted-foreground">
@@ -83,10 +84,7 @@ const SharePage = () => {
           {/* Header */}
           <div className="text-center mb-8 animate-fade-in">
             <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center glow-sm">
-                <Film className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold text-foreground">DemoFlix</span>
+              <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
             </div>
             <h1 className="text-3xl font-bold mb-2 text-foreground">{project?.name}</h1>
             <p className="text-muted-foreground">

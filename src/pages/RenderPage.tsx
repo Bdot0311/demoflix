@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Film, Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import demoflixLogo from "@/assets/demoflix-logo.png";
 
 const processingMessages = [
   "Analyzing your visuals...",
@@ -201,8 +202,8 @@ const RenderPage = () => {
       <div className="relative z-10 text-center max-w-lg px-6">
         {/* Animated Logo */}
         <div className="mb-12">
-          <div className="w-32 h-32 mx-auto rounded-3xl bg-primary/20 flex items-center justify-center animate-pulse-glow relative">
-            <Film className="w-16 h-16 text-primary" />
+          <div className="relative">
+            <img src={demoflixLogo} alt="DemoFlix" className="w-48 h-auto mx-auto animate-pulse-glow" />
             <div className="absolute inset-0 rounded-3xl border-2 border-primary/50 animate-ping" />
           </div>
         </div>
