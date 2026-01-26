@@ -2,3 +2,6 @@ project_id = "gcwtrscvdteidwdusoee"
 
 [functions.generate-storyboard]
 verify_jwt = false
+
+[functions.recommend-music]
+verify_jwt = false
