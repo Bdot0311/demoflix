@@ -67,7 +67,9 @@ function buildShotstackTimeline(
   scenes: Scene[],
   assets: Asset[],
   style: string,
-  outputFormat: "16:9" | "9:16" | "1:1" = "16:9"
+  outputFormat: "16:9" | "9:16" | "1:1" = "16:9",
+  musicUrl?: string,
+  musicVolume: number = 80
 ) {
   const assetMap = new Map(assets.map((a) => [a.id, a]));
   const tracks: any[] = [];
@@ -192,6 +194,28 @@ function buildShotstackTimeline(
   tracks.push({ clips: overlayClips }); // Vignette overlay
   tracks.push({ clips: textClips }); // Text on top
 
+  // Add background music track if provided
+  if (musicUrl) {
+    const totalDuration = scenes.reduce((sum, s) => sum + s.duration_ms / 1000, 0);
+    tracks.push({
+      clips: [
+        {
+          asset: {
+            type: "audio",
+            src: musicUrl,
+            volume: musicVolume / 100, // Convert 0-100 to 0-1
+          },
+          start: 0,
+          length: totalDuration,
+          transition: {
+            in: "fadeIn",
+            out: "fadeOut",
+          },
+        },
+      ],
+    });
+  }
+
   // Resolution based on format
   const resolution = outputFormat === "9:16" 
     ? { width: 1080, height: 1920 } 
@@ -283,17 +307,37 @@ serve(async (req) => {
       throw new Error("Failed to fetch assets");
     }
 
+    // Fetch selected music track if set
+    let musicUrl: string | undefined;
+    let musicVolume = 80;
+    
+    if (project.selected_music_track) {
+      const { data: musicTrack } = await supabase
+        .from("music_tracks")
+        .select("file_url")
+        .eq("id", project.selected_music_track)
+        .single();
+      
+      if (musicTrack) {
+        musicUrl = musicTrack.file_url;
+        musicVolume = project.music_volume || 80;
+      }
+    }
+
     // Update render status to processing
     await supabase
       .from("renders")
       .update({ status: "processing", started_at: new Date().toISOString() })
       .eq("id", renderId);
 
-    // Build Shotstack timeline
+    // Build Shotstack timeline with music
     const shotstackPayload = buildShotstackTimeline(
       scenes as Scene[],
       (assets || []) as Asset[],
-      project.style || "netflix"
+      project.style || "netflix",
+      "16:9",
+      musicUrl,
+      musicVolume
     );
 
     console.log("Submitting to Shotstack:", JSON.stringify(shotstackPayload, null, 2));
