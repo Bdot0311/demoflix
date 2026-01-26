@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,29 +18,26 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  horizontalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import {
   Film,
   ArrowLeft,
-  Play,
-  Pause,
   Type,
   Clock,
   Music,
   Palette,
   Sparkles,
   Save,
-  Volume2,
-  VolumeX,
   Wand2,
   Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { usePlayback } from "@/hooks/usePlayback";
 import { SortableScene } from "@/components/editor/SortableScene";
-import { TimelineScene } from "@/components/editor/TimelineScene";
+import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
+import { TimelineTrack } from "@/components/editor/TimelineTrack";
 
 interface Scene {
   id: string;
@@ -78,15 +75,30 @@ const Editor = () => {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<string | null>("1");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Playback hook for real-time preview
+  const handleSceneChange = useCallback((sceneId: string) => {
+    setSelectedScene(sceneId);
+  }, []);
+
+  const {
+    isPlaying,
+    currentTime,
+    currentSceneIndex,
+    currentSceneProgress,
+    totalDuration,
+    toggle: togglePlayback,
+    seek,
+    seekToScene,
+    reset: resetPlayback,
+  } = usePlayback({ scenes, onSceneChange: handleSceneChange });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -340,7 +352,6 @@ const Editor = () => {
   };
 
   const selectedSceneData = scenes.find((s) => s.id === selectedScene);
-  const totalDuration = scenes.reduce((acc, s) => acc + s.duration_ms, 0);
 
   if (isLoading) {
     return (
@@ -443,135 +454,39 @@ const Editor = () => {
         <div className="flex-1 flex flex-col">
           {/* Preview */}
           <div className="flex-1 flex items-center justify-center p-8">
-            <div className="relative w-full max-w-4xl aspect-video rounded-xl overflow-hidden border border-border shadow-cinema bg-card">
-              {selectedSceneData?.asset ? (
-                selectedSceneData.asset.file_type === "video" ? (
-                  <video
-                    src={selectedSceneData.asset.file_url}
-                    className="w-full h-full object-cover"
-                    muted={isMuted}
-                  />
-                ) : (
-                  <img
-                    src={selectedSceneData.asset.file_url}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                )
-              ) : assets[0] ? (
-                assets[0].file_type === "video" ? (
-                  <video
-                    src={assets[0].file_url}
-                    className="w-full h-full object-cover"
-                    muted={isMuted}
-                  />
-                ) : (
-                  <img
-                    src={assets[0].file_url}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                )
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <p className="text-muted-foreground">No preview available</p>
-                </div>
-              )}
-
-              {/* Text Overlay */}
-              {selectedSceneData && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-background/80 to-transparent">
-                  <div className="text-center p-8">
-                    <h2 className="text-4xl font-bold text-foreground mb-2 drop-shadow-lg">
-                      {selectedSceneData.headline}
-                    </h2>
-                    {selectedSceneData.subtext && (
-                      <p className="text-xl text-foreground/80 drop-shadow">
-                        {selectedSceneData.subtext}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Play/Pause Overlay */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-              >
-                <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center">
-                  {isPlaying ? (
-                    <Pause className="w-8 h-8 text-primary-foreground" />
-                  ) : (
-                    <Play className="w-8 h-8 text-primary-foreground ml-1" />
-                  )}
-                </div>
-              </button>
-            </div>
+            <PreviewPlayer
+              scenes={scenes}
+              currentSceneIndex={currentSceneIndex}
+              currentSceneProgress={currentSceneProgress}
+              isPlaying={isPlaying}
+              onTogglePlay={togglePlayback}
+              fallbackAsset={assets[0]}
+            />
           </div>
 
           {/* Timeline */}
-          <div className="border-t border-border/50 bg-card/50 p-4">
-            <div className="flex items-center gap-4 mb-4">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsPlaying(!isPlaying)}
-              >
-                {isPlaying ? (
-                  <Pause className="w-5 h-5" />
-                ) : (
-                  <Play className="w-5 h-5" />
-                )}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsMuted(!isMuted)}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                {(currentTime / 1000).toFixed(1)}s / {(totalDuration / 1000).toFixed(1)}s
-              </div>
-            </div>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={scenes.map((s) => s.id)}
-                strategy={horizontalListSortingStrategy}
-              >
-                <div className="flex gap-1 overflow-x-auto pb-2">
-                  {scenes.map((scene) => (
-                    <TimelineScene
-                      key={scene.id}
-                      scene={scene}
-                      isSelected={selectedScene === scene.id}
-                      widthPercent={(scene.duration_ms / totalDuration) * 100}
-                      onSelect={() => setSelectedScene(scene.id)}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-              <DragOverlay>
-                {activeScene && (
-                  <div className="h-16 min-w-[80px] rounded-lg border-2 border-primary bg-primary/20 shadow-xl backdrop-blur-sm flex items-center justify-center">
-                    <span className="text-xs text-foreground font-medium px-2 truncate">
-                      {activeScene.headline || "Scene"}
-                    </span>
-                  </div>
-                )}
-              </DragOverlay>
-            </DndContext>
-          </div>
+          <TimelineTrack
+            scenes={scenes}
+            selectedSceneId={selectedScene}
+            currentTime={currentTime}
+            totalDuration={totalDuration}
+            currentSceneIndex={currentSceneIndex}
+            isPlaying={isPlaying}
+            isMuted={isMuted}
+            activeId={activeId}
+            onSelectScene={(id) => {
+              setSelectedScene(id);
+              const index = scenes.findIndex((s) => s.id === id);
+              if (index >= 0) seekToScene(index);
+            }}
+            onTogglePlay={togglePlayback}
+            onToggleMute={() => setIsMuted(!isMuted)}
+            onSeek={seek}
+            onSeekToScene={seekToScene}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            sensors={sensors}
+          />
         </div>
 
         {/* Right Sidebar - Properties */}
