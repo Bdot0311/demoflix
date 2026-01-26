@@ -114,6 +114,103 @@ const Editor = () => {
     })
   );
 
+  // Keyboard shortcuts for playback controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        return;
+      }
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          togglePlayback();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          if (e.shiftKey) {
+            // Shift + Left: Go to beginning
+            seekToScene(0);
+          } else {
+            // Left: Previous scene
+            const prevIndex = Math.max(0, currentSceneIndex - 1);
+            seekToScene(prevIndex);
+          }
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          if (e.shiftKey) {
+            // Shift + Right: Go to end
+            seekToScene(scenes.length - 1);
+          } else {
+            // Right: Next scene
+            const nextIndex = Math.min(scenes.length - 1, currentSceneIndex + 1);
+            seekToScene(nextIndex);
+          }
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          // Select previous scene (without seeking)
+          if (selectedScene) {
+            const currentIdx = scenes.findIndex((s) => s.id === selectedScene);
+            if (currentIdx > 0) {
+              setSelectedScene(scenes[currentIdx - 1].id);
+            }
+          }
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          // Select next scene (without seeking)
+          if (selectedScene) {
+            const currentIdx = scenes.findIndex((s) => s.id === selectedScene);
+            if (currentIdx < scenes.length - 1) {
+              setSelectedScene(scenes[currentIdx + 1].id);
+            }
+          }
+          break;
+        case "Home":
+          e.preventDefault();
+          seekToScene(0);
+          break;
+        case "End":
+          e.preventDefault();
+          seekToScene(scenes.length - 1);
+          break;
+        case "KeyM":
+          e.preventDefault();
+          setIsMuted((prev) => !prev);
+          break;
+        case "Digit1":
+        case "Digit2":
+        case "Digit3":
+        case "Digit4":
+        case "Digit5":
+        case "Digit6":
+        case "Digit7":
+        case "Digit8":
+        case "Digit9":
+          e.preventDefault();
+          const sceneNum = parseInt(e.code.replace("Digit", "")) - 1;
+          if (sceneNum < scenes.length) {
+            seekToScene(sceneNum);
+            setSelectedScene(scenes[sceneNum].id);
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          if (isPlaying) {
+            togglePlayback();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlayback, seekToScene, currentSceneIndex, scenes, selectedScene, isPlaying]);
+
   useEffect(() => {
     const loadProject = async () => {
       if (!projectId) return;
