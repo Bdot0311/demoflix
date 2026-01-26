@@ -37,7 +37,19 @@ import {
   Keyboard,
   Brain,
   Download,
+  Monitor,
+  Smartphone,
+  Square,
+  ChevronDown,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
 import { KeyboardShortcutsModal } from "@/components/editor/KeyboardShortcutsModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -593,11 +605,34 @@ const Editor = () => {
     }
   };
 
-  const handleExportVideo = () => {
+  type ExportFormat = {
+    id: string;
+    name: string;
+    aspect: string;
+    urlKey: "video_url" | "video_url_vertical" | "video_url_square";
+    icon: React.ReactNode;
+  };
+
+  const exportFormats: ExportFormat[] = [
+    { id: "horizontal", name: "Horizontal", aspect: "16:9", urlKey: "video_url", icon: <Monitor className="w-4 h-4" /> },
+    { id: "vertical", name: "Vertical", aspect: "9:16", urlKey: "video_url_vertical", icon: <Smartphone className="w-4 h-4" /> },
+    { id: "square", name: "Square", aspect: "1:1", urlKey: "video_url_square", icon: <Square className="w-4 h-4" /> },
+  ];
+
+  const socialFormats: ExportFormat[] = [
+    { id: "youtube", name: "YouTube", aspect: "16:9", urlKey: "video_url", icon: <Monitor className="w-4 h-4" /> },
+    { id: "tiktok", name: "TikTok / Reels", aspect: "9:16", urlKey: "video_url_vertical", icon: <Smartphone className="w-4 h-4" /> },
+    { id: "instagram-feed", name: "Instagram Feed", aspect: "1:1", urlKey: "video_url_square", icon: <Square className="w-4 h-4" /> },
+    { id: "instagram-story", name: "Instagram Story", aspect: "9:16", urlKey: "video_url_vertical", icon: <Smartphone className="w-4 h-4" /> },
+    { id: "twitter", name: "Twitter / X", aspect: "16:9", urlKey: "video_url", icon: <Monitor className="w-4 h-4" /> },
+    { id: "linkedin", name: "LinkedIn", aspect: "16:9", urlKey: "video_url", icon: <Monitor className="w-4 h-4" /> },
+  ];
+
+  const handleExportVideo = (format: ExportFormat) => {
     if (!project) return;
 
-    // Check if there's a completed render with a video URL
-    if (!latestRender || latestRender.status !== "completed" || !latestRender.video_url) {
+    // Check if there's a completed render
+    if (!latestRender || latestRender.status !== "completed") {
       toast({
         variant: "destructive",
         title: "No video available",
@@ -606,10 +641,20 @@ const Editor = () => {
       return;
     }
 
+    const videoUrl = latestRender[format.urlKey];
+    if (!videoUrl) {
+      toast({
+        variant: "destructive",
+        title: "Format not available",
+        description: `The ${format.name} format hasn't been rendered yet.`,
+      });
+      return;
+    }
+
     // Download the MP4 file
     const a = document.createElement("a");
-    a.href = latestRender.video_url;
-    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_trailer.mp4`;
+    a.href = videoUrl;
+    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${format.id}.mp4`;
     a.target = "_blank";
     document.body.appendChild(a);
     a.click();
@@ -617,7 +662,7 @@ const Editor = () => {
 
     toast({
       title: "Download Started",
-      description: "Your MP4 trailer is downloading.",
+      description: `Downloading ${format.name} (${format.aspect}) format...`,
     });
   };
 
@@ -703,16 +748,46 @@ const Editor = () => {
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? "Saving..." : "Save"}
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleExportVideo}
-              className="border-border"
-              title="Export MP4 video"
-              disabled={!latestRender?.video_url}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export MP4
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="border-border"
+                  disabled={!latestRender?.video_url}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export MP4
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-card border-border z-50">
+                <DropdownMenuLabel>Standard Formats</DropdownMenuLabel>
+                {exportFormats.map((format) => (
+                  <DropdownMenuItem
+                    key={format.id}
+                    onClick={() => handleExportVideo(format)}
+                    className="cursor-pointer"
+                  >
+                    {format.icon}
+                    <span className="ml-2">{format.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{format.aspect}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Social Platforms</DropdownMenuLabel>
+                {socialFormats.map((format) => (
+                  <DropdownMenuItem
+                    key={format.id}
+                    onClick={() => handleExportVideo(format)}
+                    className="cursor-pointer"
+                  >
+                    {format.icon}
+                    <span className="ml-2">{format.name}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">{format.aspect}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={handleGenerate} className="bg-primary hover:bg-primary/90 glow-sm">
               <Sparkles className="w-4 h-4 mr-2" />
               Generate Trailer
