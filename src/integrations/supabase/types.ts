@@ -120,13 +120,19 @@ export type Database = {
       }
       projects: {
         Row: {
+          brand_color: string | null
+          brand_color_secondary: string | null
           created_at: string
           description: string | null
           duration: number
           id: string
+          logo_position: string | null
+          logo_size: string | null
+          logo_url: string | null
           music_volume: number | null
           name: string
           selected_music_track: string | null
+          show_logo_on_all_scenes: boolean | null
           status: string
           style: string
           thumbnail_url: string | null
@@ -134,13 +140,19 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          brand_color?: string | null
+          brand_color_secondary?: string | null
           created_at?: string
           description?: string | null
           duration?: number
           id?: string
+          logo_position?: string | null
+          logo_size?: string | null
+          logo_url?: string | null
           music_volume?: number | null
           name: string
           selected_music_track?: string | null
+          show_logo_on_all_scenes?: boolean | null
           status?: string
           style?: string
           thumbnail_url?: string | null
@@ -148,13 +160,19 @@ export type Database = {
           user_id: string
         }
         Update: {
+          brand_color?: string | null
+          brand_color_secondary?: string | null
           created_at?: string
           description?: string | null
           duration?: number
           id?: string
+          logo_position?: string | null
+          logo_size?: string | null
+          logo_url?: string | null
           music_volume?: number | null
           name?: string
           selected_music_track?: string | null
+          show_logo_on_all_scenes?: boolean | null
           status?: string
           style?: string
           thumbnail_url?: string | null
