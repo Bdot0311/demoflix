@@ -51,6 +51,7 @@ const LoginPage = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 mb-12">
             <img src={demoflixLogo} alt="DemoFlix" className="h-10 w-auto" />
+            <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
 
           <div className="animate-slide-up">

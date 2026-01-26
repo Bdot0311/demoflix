@@ -769,9 +769,11 @@ const Editor = () => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <img src={demoflixLogo} alt="DemoFlix" className="h-8 w-auto" />
-              <span className="font-semibold text-foreground">{project?.name}</span>
+              <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="font-medium text-foreground">{project?.name}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
