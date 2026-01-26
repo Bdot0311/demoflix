@@ -93,6 +93,12 @@ const Editor = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
+  const [latestRender, setLatestRender] = useState<{
+    video_url: string | null;
+    video_url_vertical: string | null;
+    video_url_square: string | null;
+    status: string;
+  } | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<string | null>("1");
@@ -314,6 +320,18 @@ const Editor = () => {
 
       setAssets(assetsData || []);
 
+      // Load latest render for export
+      const { data: renderData } = await supabase
+        .from("renders")
+        .select("video_url, video_url_vertical, video_url_square, status")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (renderData) {
+        setLatestRender(renderData);
+      }
       // Load or create scenes
       const { data: scenesData } = await supabase
         .from("scenes")
@@ -575,49 +593,31 @@ const Editor = () => {
     }
   };
 
-  const handleExportProject = () => {
+  const handleExportVideo = () => {
     if (!project) return;
 
-    const exportData = {
-      version: "1.0",
-      exportedAt: new Date().toISOString(),
-      project: {
-        name: project.name,
-        style: project.style,
-        duration: project.duration,
-        status: project.status,
-      },
-      scenes: scenes.map((scene) => ({
-        order_index: scene.order_index,
-        headline: scene.headline,
-        subtext: scene.subtext,
-        duration_ms: scene.duration_ms,
-        transition: scene.transition,
-        asset: scene.asset ? {
-          file_url: scene.asset.file_url,
-          file_type: scene.asset.file_type,
-        } : null,
-      })),
-      settings: {
-        primaryColor,
-        selectedTrack,
-        isMuted,
-      },
-    };
+    // Check if there's a completed render with a video URL
+    if (!latestRender || latestRender.status !== "completed" || !latestRender.video_url) {
+      toast({
+        variant: "destructive",
+        title: "No video available",
+        description: "Generate your trailer first, then come back to export the MP4.",
+      });
+      return;
+    }
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    // Download the MP4 file
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.json`;
+    a.href = latestRender.video_url;
+    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_trailer.mp4`;
+    a.target = "_blank";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 
     toast({
-      title: "Project Exported",
-      description: "Your project has been downloaded as a JSON file.",
+      title: "Download Started",
+      description: "Your MP4 trailer is downloading.",
     });
   };
 
@@ -705,12 +705,13 @@ const Editor = () => {
             </Button>
             <Button 
               variant="outline" 
-              onClick={handleExportProject}
+              onClick={handleExportVideo}
               className="border-border"
-              title="Export project as JSON"
+              title="Export MP4 video"
+              disabled={!latestRender?.video_url}
             >
               <Download className="w-4 h-4 mr-2" />
-              Export
+              Export MP4
             </Button>
             <Button onClick={handleGenerate} className="bg-primary hover:bg-primary/90 glow-sm">
               <Sparkles className="w-4 h-4 mr-2" />
