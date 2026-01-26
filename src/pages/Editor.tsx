@@ -34,6 +34,8 @@ import {
   Save,
   Volume2,
   VolumeX,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +86,7 @@ const Editor = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -255,6 +258,87 @@ const Editor = () => {
     navigate(`/render/${project.id}`);
   };
 
+  const handleAIGenerate = async () => {
+    if (!project || assets.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No assets",
+        description: "Please upload some images first.",
+      });
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      // Get image URLs from assets
+      const imageUrls = assets
+        .filter((a) => a.file_type === "image")
+        .slice(0, 10)
+        .map((a) => a.file_url);
+
+      const response = await supabase.functions.invoke("generate-storyboard", {
+        body: {
+          imageUrls,
+          style: project.style || "netflix",
+          duration: project.duration || 30,
+          assetCount: assets.length,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to generate storyboard");
+      }
+
+      const { scenes: generatedScenes } = response.data;
+
+      if (!generatedScenes || generatedScenes.length === 0) {
+        throw new Error("No scenes generated");
+      }
+
+      // Update existing scenes with AI-generated content
+      const updatedScenes = scenes.map((scene, index) => {
+        const aiScene = generatedScenes[index];
+        if (aiScene) {
+          return {
+            ...scene,
+            headline: aiScene.headline || scene.headline,
+            subtext: aiScene.subtext || scene.subtext,
+            duration_ms: aiScene.duration_ms || scene.duration_ms,
+          };
+        }
+        return scene;
+      });
+
+      // Save to database
+      for (const scene of updatedScenes) {
+        await supabase
+          .from("scenes")
+          .update({
+            headline: scene.headline,
+            subtext: scene.subtext,
+            duration_ms: scene.duration_ms,
+          })
+          .eq("id", scene.id);
+      }
+
+      setScenes(updatedScenes);
+
+      toast({
+        title: "AI Storyboard Generated!",
+        description: "Scene headlines and structure have been created.",
+      });
+    } catch (error) {
+      console.error("AI generation error:", error);
+      toast({
+        variant: "destructive",
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate storyboard",
+      });
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   const selectedSceneData = scenes.find((s) => s.id === selectedScene);
   const totalDuration = scenes.reduce((acc, s) => acc + s.duration_ms, 0);
 
@@ -287,6 +371,19 @@ const Editor = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={handleAIGenerate} 
+              disabled={isGeneratingAI || assets.length === 0}
+              className="border-border"
+            >
+              {isGeneratingAI ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="w-4 h-4 mr-2" />
+              )}
+              {isGeneratingAI ? "Generating..." : "AI Generate"}
+            </Button>
             <Button variant="outline" onClick={handleSave} disabled={isSaving} className="border-border">
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? "Saving..." : "Save"}
