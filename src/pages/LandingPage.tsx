@@ -215,7 +215,7 @@ const LandingPage = () => {
               <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 DemoFlix. All rights reserved.
+              © 2025 BDØT Industries LLC. All rights reserved.
             </p>
             <div className="flex items-center gap-6">
               <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground cinematic-underline">
