@@ -1,1 +1,4 @@
 project_id = "gcwtrscvdteidwdusoee"
+
+[functions.generate-storyboard]
+verify_jwt = false
