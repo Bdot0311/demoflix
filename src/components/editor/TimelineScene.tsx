@@ -26,10 +26,9 @@ export const TimelineScene = ({ scene, isSelected, widthPercent, onSelect }: Tim
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    transition: transition || "transform 200ms ease",
     width: `${widthPercent}%`,
     minWidth: "80px",
-    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
@@ -41,11 +40,11 @@ export const TimelineScene = ({ scene, isSelected, widthPercent, onSelect }: Tim
       {...listeners}
       className={`flex-shrink-0 h-16 rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing ${
         isSelected
-          ? "border-primary"
+          ? "border-primary bg-primary/10"
           : "border-border hover:border-primary/50"
-      } ${isDragging ? "z-50 shadow-lg" : ""}`}
+      } ${isDragging ? "opacity-40 scale-95 ring-2 ring-primary/50" : "hover:scale-[1.02]"}`}
     >
-      <div className="h-full bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground p-2 truncate">
+      <div className="h-full bg-muted/50 rounded-md flex items-center justify-center text-xs text-muted-foreground p-2 truncate">
         {scene.headline || "Scene"}
       </div>
     </button>
