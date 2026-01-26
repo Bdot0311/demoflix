@@ -124,7 +124,9 @@ export type Database = {
           description: string | null
           duration: number
           id: string
+          music_volume: number | null
           name: string
+          selected_music_track: string | null
           status: string
           style: string
           thumbnail_url: string | null
@@ -136,7 +138,9 @@ export type Database = {
           description?: string | null
           duration?: number
           id?: string
+          music_volume?: number | null
           name: string
+          selected_music_track?: string | null
           status?: string
           style?: string
           thumbnail_url?: string | null
@@ -148,7 +152,9 @@ export type Database = {
           description?: string | null
           duration?: number
           id?: string
+          music_volume?: number | null
           name?: string
+          selected_music_track?: string | null
           status?: string
           style?: string
           thumbnail_url?: string | null

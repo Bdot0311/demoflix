@@ -59,6 +59,7 @@ import { useHistory } from "@/hooks/useHistory";
 import { SortableScene } from "@/components/editor/SortableScene";
 import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
+import { MusicSelector } from "@/components/editor/MusicSelector";
 
 interface Scene {
   id: string;
@@ -79,16 +80,26 @@ interface Project {
   style: string;
   duration: number;
   status: string;
+  selected_music_track: string | null;
+  music_volume: number;
 }
 
-const musicTracks = [
-  { id: "1", name: "Epic Cinematic", category: "Cinematic", artist: "TrailerScore", duration_seconds: 60 },
-  { id: "2", name: "Tech Ambient", category: "Tech", artist: "FutureSounds", duration_seconds: 45 },
-  { id: "3", name: "Hype Build", category: "Hype", artist: "DropBeats", duration_seconds: 30 },
-  { id: "4", name: "Soft Ambient", category: "Ambient", artist: "ChillWave", duration_seconds: 60 },
-  { id: "5", name: "Dramatic Tension", category: "Cinematic", artist: "OrchestraX", duration_seconds: 45 },
-  { id: "6", name: "Upbeat Corporate", category: "Corporate", artist: "BizTunes", duration_seconds: 30 },
-];
+interface MusicTrack {
+  id: string;
+  name: string;
+  artist: string | null;
+  category: string;
+  duration_seconds: number;
+  file_url: string;
+  preview_url: string | null;
+}
+
+interface MusicRecommendation {
+  track_id: string;
+  track_name: string;
+  match_score: number;
+  reason: string;
+}
 
 interface MusicRecommendation {
   track_id: string;
@@ -113,7 +124,9 @@ const Editor = () => {
   } | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState<string | null>("1");
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [musicVolume, setMusicVolume] = useState(80);
+  const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [primaryColor, setPrimaryColor] = useState("#ef4444");
@@ -322,6 +335,16 @@ const Editor = () => {
       }
 
       setProject(projectData);
+      setSelectedTrack(projectData.selected_music_track || null);
+      setMusicVolume(projectData.music_volume || 80);
+
+      // Load music tracks from database
+      const { data: tracksData } = await supabase
+        .from("music_tracks")
+        .select("*")
+        .order("category", { ascending: true });
+
+      setMusicTracks(tracksData || []);
 
       // Load assets
       const { data: assetsData } = await supabase
@@ -584,9 +607,12 @@ const Editor = () => {
       setMusicRecommendations(recommendations || []);
       setStoryboardMood(overall_mood || null);
 
-      // Auto-select the top recommendation
-      if (recommendations?.[0]?.track_id) {
-        setSelectedTrack(recommendations[0].track_id);
+      // Auto-select the top recommendation by matching track name
+      if (recommendations?.[0]?.track_name) {
+        const matchedTrack = musicTracks.find(t => t.name === recommendations[0].track_name);
+        if (matchedTrack) {
+          handleSelectTrack(matchedTrack.id);
+        }
       }
 
       toast({
@@ -602,6 +628,30 @@ const Editor = () => {
       });
     } finally {
       setIsRecommendingMusic(false);
+    }
+  };
+
+  const handleSelectTrack = async (trackId: string) => {
+    setSelectedTrack(trackId);
+    
+    // Save to database
+    if (projectId) {
+      await supabase
+        .from("projects")
+        .update({ selected_music_track: trackId })
+        .eq("id", projectId);
+    }
+  };
+
+  const handleVolumeChange = async (volume: number) => {
+    setMusicVolume(volume);
+    
+    // Save to database (debounced effect would be better for production)
+    if (projectId) {
+      await supabase
+        .from("projects")
+        .update({ music_volume: volume })
+        .eq("id", projectId);
     }
   };
 
@@ -947,77 +997,19 @@ const Editor = () => {
                 </div>
               </div>
 
-              {/* Music */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                    <Music className="w-4 h-4" />
-                    Music
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRecommendMusic}
-                    disabled={isRecommendingMusic || scenes.length === 0}
-                    className="text-xs h-7"
-                    title="Get AI music recommendations"
-                  >
-                    {isRecommendingMusic ? (
-                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                    ) : (
-                      <Brain className="w-3 h-3 mr-1" />
-                    )}
-                    {isRecommendingMusic ? "..." : "AI Pick"}
-                  </Button>
-                </div>
-
-                {/* Mood indicator */}
-                {storyboardMood && (
-                  <div className="mb-3 px-2 py-1.5 rounded-md bg-primary/10 border border-primary/20">
-                    <div className="text-xs text-muted-foreground">Detected mood:</div>
-                    <div className="text-sm font-medium text-foreground capitalize">{storyboardMood}</div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  {musicTracks.map((track) => {
-                    const recommendation = musicRecommendations.find((r) => r.track_id === track.id);
-                    const isRecommended = !!recommendation;
-                    
-                    return (
-                      <button
-                        key={track.id}
-                        onClick={() => setSelectedTrack(track.id)}
-                        className={`w-full p-3 rounded-lg text-left transition-all relative ${
-                          selectedTrack === track.id
-                            ? "bg-primary/20 border border-primary/50"
-                            : isRecommended
-                            ? "bg-accent/30 border border-accent/50 hover:bg-accent/40"
-                            : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                        }`}
-                      >
-                        {isRecommended && (
-                          <div className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] px-1.5 py-0.5 rounded-full font-medium">
-                            {recommendation.match_score}%
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium text-foreground">{track.name}</div>
-                          {isRecommended && (
-                            <Brain className="w-3 h-3 text-accent-foreground" />
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{track.category}</div>
-                        {recommendation?.reason && (
-                          <div className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
-                            {recommendation.reason}
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Music Selector */}
+              <MusicSelector
+                tracks={musicTracks}
+                selectedTrackId={selectedTrack}
+                onSelectTrack={handleSelectTrack}
+                recommendations={musicRecommendations}
+                storyboardMood={storyboardMood}
+                isRecommending={isRecommendingMusic}
+                onRecommend={handleRecommendMusic}
+                volume={musicVolume}
+                onVolumeChange={handleVolumeChange}
+                disabled={scenes.length === 0}
+              />
 
               {/* Brand Colors */}
               <div>
