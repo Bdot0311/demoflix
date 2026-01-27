@@ -111,6 +111,10 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
+        "float-up": {
+          "0%": { transform: "translateY(0) scale(1)", opacity: "0.3" },
+          "100%": { transform: "translateY(-100vh) scale(0.5)", opacity: "0" },
+        },
         "slide-up": {
           "0%": { opacity: "0", transform: "translateY(20px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
@@ -127,6 +131,10 @@ export default {
           "0%": { clipPath: "inset(50% 0)", opacity: "0" },
           "100%": { clipPath: "inset(0)", opacity: "1" },
         },
+        "text-reveal": {
+          "0%": { transform: "translateY(100%)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -134,10 +142,12 @@ export default {
         shimmer: "shimmer 2s linear infinite",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         float: "float 3s ease-in-out infinite",
+        "float-up": "float-up 15s linear infinite",
         "slide-up": "slide-up 0.6s ease-out forwards",
         "fade-in": "fade-in 0.4s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
         "cinema-reveal": "cinema-reveal 0.8s ease-out forwards",
+        "text-reveal": "text-reveal 0.5s ease-out forwards",
       },
     },
   },
