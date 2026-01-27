@@ -79,14 +79,18 @@ const NewDemo = () => {
           .eq("project_id", projectId)
           .order("order_index");
 
+        // For single asset trailers, all scenes use the same asset
+        const isSingleAsset = data.isSingleAsset || files.length === 1;
+
         // Create scenes with AI-generated Netflix-style content
         const scenesToInsert = data.scenes.map((scene: any, index: number) => ({
           project_id: projectId,
-          asset_id: assets?.[index]?.id || null,
+          // For single asset, all scenes use the first asset
+          asset_id: isSingleAsset ? (assets?.[0]?.id || null) : (assets?.[index]?.id || null),
           order_index: scene.order_index || index,
           headline: scene.headline || `Scene ${index + 1}`,
           subtext: scene.subtext || "",
-          duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / files.length),
+          duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / data.scenes.length),
           transition: scene.scene_type === "hook" ? "fade" : "slideLeft",
           zoom_level: scene.zoom_level || 1.2,
           pan_x: scene.pan_direction === "left" ? -0.1 : scene.pan_direction === "right" ? 0.1 : 0,
