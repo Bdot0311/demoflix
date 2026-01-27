@@ -13,6 +13,7 @@ import Editor from "./pages/Editor";
 import RenderPage from "./pages/RenderPage";
 import PreviewPage from "./pages/PreviewPage";
 import SharePage from "./pages/SharePage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/render/:projectId" element={<RenderPage />} />
             <Route path="/preview/:projectId" element={<PreviewPage />} />
             <Route path="/share/:shareId" element={<SharePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
