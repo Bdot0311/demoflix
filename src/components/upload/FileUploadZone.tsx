@@ -143,21 +143,34 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
         throw new Error(data.error || 'Failed to scrape website');
       }
 
-      // Convert base64 screenshot to File
-      const base64Data = data.screenshot;
-      const byteString = atob(base64Data);
-      const mimeType = 'image/png';
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], { type: mimeType });
-      
       // Create filename from URL
       const hostname = new URL(formattedUrl).hostname.replace(/[^a-z0-9]/gi, '-');
       const filename = `${hostname}-screenshot.png`;
-      const file = new File([blob], filename, { type: mimeType });
+      
+      let file: File;
+      const screenshotData = data.screenshot;
+      
+      // Check if screenshot is a URL or base64
+      if (screenshotData.startsWith('http://') || screenshotData.startsWith('https://')) {
+        // Fetch the image from URL
+        const imageResponse = await fetch(screenshotData);
+        if (!imageResponse.ok) {
+          throw new Error('Failed to download screenshot from URL');
+        }
+        const blob = await imageResponse.blob();
+        file = new File([blob], filename, { type: blob.type || 'image/png' });
+      } else {
+        // Handle base64 data (legacy support)
+        const byteString = atob(screenshotData);
+        const mimeType = 'image/png';
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeType });
+        file = new File([blob], filename, { type: mimeType });
+      }
 
       addFiles([file], formattedUrl);
       setUrlInput("");
