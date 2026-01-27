@@ -28,8 +28,15 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // For single assets, we generate multiple scenes (5-7 based on duration)
+    // This creates a dynamic trailer from one screenshot with different headlines and effects
+    const isSingleAsset = assetCount === 1;
+    const targetSceneCount = isSingleAsset 
+      ? Math.max(5, Math.min(7, Math.floor(duration / 5))) // 5-7 scenes for single asset trailers
+      : assetCount;
+
     // Calculate scene duration with room for transitions
-    const sceneDuration = Math.floor((duration * 1000) / assetCount);
+    const sceneDuration = Math.floor((duration * 1000) / targetSceneCount);
 
     // Netflix-style trailer system prompt
     const systemPrompt = `You are a world-class film trailer editor who creates viral Netflix-style product trailers. Your trailers are:
@@ -43,9 +50,33 @@ Your signature style:
 - Headlines are 2-5 words MAX. No fluff. Pure impact.
 - Use power words: Revolutionary, Unleash, Dominate, Transform, Unstoppable
 - Create a narrative arc: Hook → Build tension → Reveal → Call to action
-- Each scene should make viewers FEEL something`;
+- Each scene should make viewers FEEL something
+${isSingleAsset ? `
+IMPORTANT: You are creating a multi-scene trailer from a SINGLE screenshot. 
+Each scene will show the same image with DIFFERENT:
+- Headlines and text overlays
+- Zoom levels and pan directions (Ken Burns effect)
+- This creates a dynamic, cinematic feel from one static image` : ''}`;
 
-    const userPrompt = `Create a ${duration}-second Netflix-style cinematic trailer storyboard for these ${assetCount} product screenshots.
+    const userPrompt = isSingleAsset 
+      ? `Create a ${duration}-second Netflix-style cinematic trailer from ONE product screenshot. Generate ${targetSceneCount} distinct scenes that will all use the same background image but with different headlines and camera movements.
+
+TRAILER STRUCTURE (${targetSceneCount} scenes total):
+- Scene 1 (HOOK): Open with intrigue. Zoom in dramatically. Make them stop scrolling.
+- Scenes 2-${targetSceneCount - 1} (BUILD): Feature reveals with different zoom/pan combos. Each headline more powerful than the last.
+- Scene ${targetSceneCount} (CLIMAX/CTA): Pull back for full view. Epic call to action.
+
+IMPORTANT: Each scene MUST have a DIFFERENT zoom_level and pan_direction to create visual variety from one image!
+
+FOR EACH SCENE, provide:
+1. headline: 2-5 word power statement (ALL CAPS style energy)
+2. subtext: 6-12 word supporting line (optional, can be empty for pure visual impact)
+3. scene_type: "hook", "tension", "reveal", "feature", "benefit", "climax", or "cta"
+4. zoom_level: VARY between 1.0-1.5 (crucial for visual variety!)
+5. pan_direction: VARY between "left", "right", "up", "down", "center"
+
+Return ONLY a valid JSON array with exactly ${targetSceneCount} objects.`
+      : `Create a ${duration}-second Netflix-style cinematic trailer storyboard for these ${assetCount} product screenshots.
 
 TRAILER STRUCTURE:
 - Scene 1 (HOOK): Open with intrigue. Make them stop scrolling. Dark, mysterious, powerful.
@@ -59,23 +90,9 @@ FOR EACH SCENE, provide:
 4. zoom_level: 1.0-1.4 (subtle zoom for Ken Burns effect)
 5. pan_direction: "left", "right", "up", "down", or "center"
 
-HEADLINE EXAMPLES (study the energy):
-- "THE FUTURE ARRIVES"
-- "EVERYTHING CHANGES"
-- "WITNESS POWER"
-- "BEYOND LIMITS"
-- "ONE TOOL. INFINITE POSSIBILITIES."
-- "YOUR COMPETITION WON'T SEE IT COMING"
-- "THIS CHANGES EVERYTHING"
+Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
 
-SUBTEXT EXAMPLES:
-- "" (empty for dramatic pause)
-- "Built for those who refuse to settle"
-- "Where innovation meets execution"
-- "The revolution starts now"
-
-Return ONLY a valid JSON array with exactly ${assetCount} objects:
-[
+    const exampleJson = `[
   {
     "order_index": 0,
     "headline": "THE GAME HAS CHANGED",
@@ -87,8 +104,10 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects:
   }
 ]`;
 
+    const fullPrompt = userPrompt + "\n\nJSON Format Example:\n" + exampleJson;
+
     // Build content array with images for visual analysis
-    const content: any[] = [{ type: "text", text: userPrompt }];
+    const content: any[] = [{ type: "text", text: fullPrompt }];
 
     // Add images to analyze (limit to 10)
     if (imageUrls && imageUrls.length > 0) {
@@ -155,8 +174,8 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects:
     }
 
     // Validate and ensure we have the right number of scenes
-    if (!scenes || scenes.length !== assetCount) {
-      console.log("Generating fallback Netflix-style scenes");
+    if (!scenes || scenes.length !== targetSceneCount) {
+      console.log("Generating fallback Netflix-style scenes for", targetSceneCount, "scenes");
       // Generate compelling fallback scenes
       const fallbackHeadlines = [
         { headline: "THE FUTURE IS HERE", subtext: "", type: "hook", zoom: 1.3, pan: "center" },
@@ -168,8 +187,8 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects:
         { headline: "START NOW", subtext: "The revolution begins today", type: "cta", zoom: 1.1, pan: "center" },
       ];
 
-      scenes = Array.from({ length: assetCount }, (_, i) => {
-        const fallback = fallbackHeadlines[Math.min(i, fallbackHeadlines.length - 1)];
+      scenes = Array.from({ length: targetSceneCount }, (_, i) => {
+        const fallback = fallbackHeadlines[i % fallbackHeadlines.length];
         // First scene is always hook, last is always CTA
         if (i === 0) {
           return {
@@ -178,18 +197,18 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects:
             subtext: "",
             duration_ms: sceneDuration,
             scene_type: "hook",
-            zoom_level: 1.3,
+            zoom_level: 1.4,
             pan_direction: "center",
           };
         }
-        if (i === assetCount - 1) {
+        if (i === targetSceneCount - 1) {
           return {
             order_index: i,
             headline: "START NOW",
             subtext: "Join the revolution today",
             duration_ms: sceneDuration,
             scene_type: "cta",
-            zoom_level: 1.1,
+            zoom_level: 1.0,
             pan_direction: "center",
           };
         }
@@ -205,19 +224,21 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects:
       });
     }
 
-    // Ensure all scenes have required fields
-    scenes = scenes.map((scene, i) => ({
-      order_index: scene.order_index ?? i,
-      headline: scene.headline || "POWER",
-      subtext: scene.subtext || "",
-      duration_ms: scene.duration_ms || sceneDuration,
-      scene_type: scene.scene_type || "feature",
-      zoom_level: scene.zoom_level || 1.2,
-      pan_direction: scene.pan_direction || "center",
-    }));
-
+    // Return targetSceneCount and isSingleAsset flag for frontend to handle asset linking
     return new Response(
-      JSON.stringify({ scenes }),
+      JSON.stringify({ 
+        scenes: scenes.map((scene, i) => ({
+          order_index: scene.order_index ?? i,
+          headline: scene.headline || "POWER",
+          subtext: scene.subtext || "",
+          duration_ms: scene.duration_ms || sceneDuration,
+          scene_type: scene.scene_type || "feature",
+          zoom_level: scene.zoom_level || 1.2,
+          pan_direction: scene.pan_direction || "center",
+        })),
+        isSingleAsset,
+        targetSceneCount
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

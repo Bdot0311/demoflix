@@ -532,43 +532,73 @@ const Editor = () => {
         throw new Error(response.error.message || "Failed to generate storyboard");
       }
 
-      const { scenes: generatedScenes } = response.data;
+      const { scenes: generatedScenes, isSingleAsset } = response.data;
 
       if (!generatedScenes || generatedScenes.length === 0) {
         throw new Error("No scenes generated");
       }
 
-      // Update existing scenes with AI-generated content
-      const updatedScenes = scenes.map((scene, index) => {
-        const aiScene = generatedScenes[index];
-        if (aiScene) {
-          return {
-            ...scene,
-            headline: aiScene.headline || scene.headline,
-            subtext: aiScene.subtext || scene.subtext,
-            duration_ms: aiScene.duration_ms || scene.duration_ms,
-          };
-        }
-        return scene;
-      });
+      // For single asset trailers, we may need to create new scenes
+      if (isSingleAsset && generatedScenes.length > scenes.length) {
+        // Delete existing scenes and create new ones
+        await supabase.from("scenes").delete().eq("project_id", project.id);
 
-      // Save to database
-      for (const scene of updatedScenes) {
-        await supabase
+        const firstAssetId = assets[0]?.id || null;
+        const newScenes = generatedScenes.map((aiScene: any, index: number) => ({
+          project_id: project.id,
+          asset_id: firstAssetId, // All scenes use the same asset
+          order_index: index,
+          headline: aiScene.headline || `Scene ${index + 1}`,
+          subtext: aiScene.subtext || "",
+          duration_ms: aiScene.duration_ms,
+          transition: aiScene.scene_type === "hook" ? "fade" : "slideLeft",
+          zoom_level: aiScene.zoom_level || 1.2,
+          pan_x: aiScene.pan_direction === "left" ? -0.1 : aiScene.pan_direction === "right" ? 0.1 : 0,
+          pan_y: aiScene.pan_direction === "up" ? -0.1 : aiScene.pan_direction === "down" ? 0.1 : 0,
+        }));
+
+        const { data: insertedScenes } = await supabase
           .from("scenes")
-          .update({
-            headline: scene.headline,
-            subtext: scene.subtext,
-            duration_ms: scene.duration_ms,
-          })
-          .eq("id", scene.id);
-      }
+          .insert(newScenes)
+          .select();
 
-      setScenes(updatedScenes);
+        if (insertedScenes) {
+          setScenes(insertedScenes);
+          setSelectedScene(insertedScenes[0].id);
+        }
+      } else {
+        // Update existing scenes with AI-generated content
+        const updatedScenes = scenes.map((scene, index) => {
+          const aiScene = generatedScenes[index];
+          if (aiScene) {
+            return {
+              ...scene,
+              headline: aiScene.headline || scene.headline,
+              subtext: aiScene.subtext || scene.subtext,
+              duration_ms: aiScene.duration_ms || scene.duration_ms,
+            };
+          }
+          return scene;
+        });
+
+        // Save to database
+        for (const scene of updatedScenes) {
+          await supabase
+            .from("scenes")
+            .update({
+              headline: scene.headline,
+              subtext: scene.subtext,
+              duration_ms: scene.duration_ms,
+            })
+            .eq("id", scene.id);
+        }
+
+        setScenes(updatedScenes);
+      }
 
       toast({
         title: "AI Storyboard Generated!",
-        description: "Scene headlines and structure have been created.",
+        description: `Created ${generatedScenes.length} cinematic scenes.`,
       });
     } catch (error) {
       console.error("AI generation error:", error);
