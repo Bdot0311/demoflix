@@ -111,7 +111,7 @@ const FloatingParticles = ({ isPlaying }: { isPlaying: boolean }) => {
   if (!isPlaying) return null;
 
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-15">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-[15]">
       {particles.map((p) => (
         <div
           key={p.id}
@@ -134,7 +134,7 @@ const FloatingParticles = ({ isPlaying }: { isPlaying: boolean }) => {
 // Scan Line Effect (Netflix/Retro style)
 const ScanLineEffect = ({ intensity = 0.03 }: { intensity?: number }) => (
   <div 
-    className="absolute inset-0 pointer-events-none z-25 mix-blend-overlay"
+    className="absolute inset-0 pointer-events-none z-[25] mix-blend-overlay"
     style={{
       background: `repeating-linear-gradient(
         0deg,
@@ -150,7 +150,7 @@ const ScanLineEffect = ({ intensity = 0.03 }: { intensity?: number }) => (
 // Vignette Effect
 const VignetteEffect = () => (
   <div 
-    className="absolute inset-0 pointer-events-none z-24"
+    className="absolute inset-0 pointer-events-none z-[24]"
     style={{
       background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%)',
     }}
@@ -161,7 +161,7 @@ const VignetteEffect = () => (
 const GlowEffect = ({ isVisible }: { isVisible: boolean }) => (
   <div 
     className={cn(
-      "absolute inset-0 z-18 transition-opacity duration-1000",
+      "absolute inset-0 z-[18] transition-opacity duration-1000",
       isVisible ? "opacity-100" : "opacity-0"
     )}
     style={{
