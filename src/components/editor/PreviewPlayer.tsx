@@ -37,6 +37,173 @@ interface PreviewPlayerProps {
 const TRANSITION_DURATION = 400;
 const TRANSITION_THRESHOLD = 0.1; // First 10% of scene is transition-in
 
+// Kinetic Typography Component - Framer-style character animation
+const KineticText = ({ 
+  text, 
+  isVisible, 
+  className,
+  delay = 0,
+  stagger = 30,
+  isFullscreen = false,
+}: { 
+  text: string; 
+  isVisible: boolean; 
+  className?: string;
+  delay?: number;
+  stagger?: number;
+  isFullscreen?: boolean;
+}) => {
+  const words = text.split(' ');
+  
+  return (
+    <span className={cn("inline-flex flex-wrap justify-center gap-x-2", className)}>
+      {words.map((word, wordIdx) => (
+        <span key={wordIdx} className="inline-flex overflow-hidden">
+          {word.split('').map((char, charIdx) => {
+            const totalDelay = delay + (wordIdx * word.length + charIdx) * stagger;
+            return (
+              <span
+                key={`${wordIdx}-${charIdx}`}
+                className={cn(
+                  "inline-block transform transition-all duration-500 ease-out",
+                  isVisible 
+                    ? "translate-y-0 opacity-100" 
+                    : "translate-y-[120%] opacity-0"
+                )}
+                style={{
+                  transitionDelay: isVisible ? `${totalDelay}ms` : '0ms',
+                }}
+              >
+                {char}
+              </span>
+            );
+          })}
+        </span>
+      ))}
+    </span>
+  );
+};
+
+// Animated Underline/Accent
+const AnimatedAccent = ({ isVisible, delay = 500 }: { isVisible: boolean; delay?: number }) => (
+  <div 
+    className={cn(
+      "h-1 bg-gradient-to-r from-primary via-primary to-transparent rounded-full transition-all duration-700 ease-out mx-auto mt-4",
+      isVisible ? "w-32 opacity-100" : "w-0 opacity-0"
+    )}
+    style={{ transitionDelay: isVisible ? `${delay}ms` : '0ms' }}
+  />
+);
+
+// Floating Particles Effect
+const FloatingParticles = ({ isPlaying }: { isPlaying: boolean }) => {
+  const particles = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      size: Math.random() * 4 + 2,
+      x: Math.random() * 100,
+      delay: Math.random() * 8,
+      duration: Math.random() * 8 + 12,
+      opacity: Math.random() * 0.2 + 0.1,
+    })), []
+  );
+
+  if (!isPlaying) return null;
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-15">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full bg-primary/40"
+          style={{
+            width: p.size,
+            height: p.size,
+            left: `${p.x}%`,
+            bottom: '-5%',
+            opacity: p.opacity,
+            animation: `float-up ${p.duration}s linear infinite`,
+            animationDelay: `${p.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
+// Scan Line Effect (Netflix/Retro style)
+const ScanLineEffect = ({ intensity = 0.03 }: { intensity?: number }) => (
+  <div 
+    className="absolute inset-0 pointer-events-none z-25 mix-blend-overlay"
+    style={{
+      background: `repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, ${intensity}) 2px,
+        rgba(0, 0, 0, ${intensity}) 4px
+      )`,
+    }}
+  />
+);
+
+// Vignette Effect
+const VignetteEffect = () => (
+  <div 
+    className="absolute inset-0 pointer-events-none z-24"
+    style={{
+      background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%)',
+    }}
+  />
+);
+
+// Glow Effect behind text
+const GlowEffect = ({ isVisible }: { isVisible: boolean }) => (
+  <div 
+    className={cn(
+      "absolute inset-0 z-18 transition-opacity duration-1000",
+      isVisible ? "opacity-100" : "opacity-0"
+    )}
+    style={{
+      background: 'radial-gradient(ellipse at center, hsl(var(--primary) / 0.15) 0%, transparent 60%)',
+    }}
+  />
+);
+
+// Progress Ring (scene progress visualization)
+const ProgressRing = ({ progress, size = 60 }: { progress: number; size?: number }) => {
+  const strokeWidth = 3;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - progress * circumference;
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="hsl(var(--muted))"
+        strokeWidth={strokeWidth}
+        opacity={0.3}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="hsl(var(--primary))"
+        strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        className="transition-all duration-100"
+      />
+    </svg>
+  );
+};
+
 export const PreviewPlayer = ({
   scenes,
   currentSceneIndex,
@@ -58,6 +225,7 @@ export const PreviewPlayer = ({
   const [displaySceneIndex, setDisplaySceneIndex] = useState(currentSceneIndex);
   const [prevSceneIndex, setPrevSceneIndex] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [textVisible, setTextVisible] = useState(false);
 
   const currentScene = scenes[currentSceneIndex];
   const displayScene = scenes[displaySceneIndex];
@@ -68,6 +236,32 @@ export const PreviewPlayer = ({
   const transitionProgress = inTransitionPhase 
     ? currentSceneProgress / TRANSITION_THRESHOLD 
     : 1;
+
+  // Trigger text animation after scene transition
+  useEffect(() => {
+    if (!isTransitioning && isPlaying) {
+      const timeout = setTimeout(() => setTextVisible(true), 100);
+      return () => clearTimeout(timeout);
+    } else if (isTransitioning) {
+      setTextVisible(false);
+    }
+  }, [isTransitioning, currentSceneIndex, isPlaying]);
+
+  // Reset text visibility on scene change
+  useEffect(() => {
+    setTextVisible(false);
+    const timeout = setTimeout(() => {
+      if (isPlaying) setTextVisible(true);
+    }, TRANSITION_DURATION + 100);
+    return () => clearTimeout(timeout);
+  }, [currentSceneIndex]);
+
+  // Show text when not playing (for preview)
+  useEffect(() => {
+    if (!isPlaying) {
+      setTextVisible(true);
+    }
+  }, [isPlaying]);
 
   // Sync music with playback
   useEffect(() => {
@@ -182,9 +376,9 @@ export const PreviewPlayer = ({
   const transitionType = (currentScene?.transition || "fade") as TransitionType;
 
   // Calculate Ken Burns effect based on scene progress
-  const scale = 1 + currentSceneProgress * 0.05;
-  const translateX = currentSceneProgress * 2 - 1;
-  const translateY = currentSceneProgress * 1 - 0.5;
+  const scale = 1 + currentSceneProgress * 0.08;
+  const translateX = currentSceneProgress * 3 - 1.5;
+  const translateY = currentSceneProgress * 2 - 1;
 
   // Get transition styles for outgoing (previous) scene
   const getOutgoingStyles = useMemo(() => {
@@ -424,37 +618,63 @@ export const PreviewPlayer = ({
         )}
       </div>
 
-      {/* Text Overlay with Animation */}
+      {/* Floating Particles */}
+      <FloatingParticles isPlaying={isPlaying} />
+
+      {/* Glow Effect */}
+      <GlowEffect isVisible={textVisible && isPlaying} />
+
+      {/* Vignette Effect */}
+      <VignetteEffect />
+
+      {/* Scan Lines (subtle) */}
+      <ScanLineEffect intensity={0.02} />
+
+      {/* Text Overlay with Kinetic Animation */}
       {displayScene && (
         <div
           className={cn(
-            "absolute inset-0 z-20 flex items-center justify-center bg-gradient-to-t from-background/80 via-background/20 to-transparent transition-all",
-            isTransitioning ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"
+            "absolute inset-0 z-20 flex items-center justify-center",
+            "bg-gradient-to-t from-background/90 via-background/30 to-transparent"
           )}
-          style={{ transitionDuration: `${TRANSITION_DURATION}ms` }}
         >
-          <div className="text-center p-8">
+          <div className="text-center p-8 max-w-4xl">
+            {/* Main Headline with Kinetic Typography */}
             <h2
               className={cn(
-                "font-bold text-foreground mb-2 drop-shadow-lg transition-all duration-500",
-                isFullscreen ? "text-6xl" : "text-4xl",
-                isPlaying ? "animate-fade-in" : ""
+                "font-bold text-foreground mb-4",
+                isFullscreen ? "text-7xl" : "text-5xl"
               )}
               style={{
-                textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                textShadow: "0 4px 20px rgba(0,0,0,0.5), 0 0 40px hsl(var(--primary) / 0.3)",
+                letterSpacing: "-0.02em",
               }}
             >
-              {displayScene.headline}
+              <KineticText 
+                text={displayScene.headline || ""}
+                isVisible={textVisible}
+                delay={0}
+                stagger={25}
+                isFullscreen={isFullscreen}
+              />
             </h2>
+
+            {/* Animated Accent Line */}
+            <AnimatedAccent isVisible={textVisible} delay={400} />
+
+            {/* Subtext with delayed animation */}
             {displayScene.subtext && (
               <p
                 className={cn(
-                  "text-foreground/80 drop-shadow transition-all duration-500 delay-100",
-                  isFullscreen ? "text-2xl" : "text-xl",
-                  isPlaying ? "animate-fade-in" : ""
+                  "text-foreground/90 mt-6 transition-all duration-700 ease-out",
+                  isFullscreen ? "text-2xl" : "text-lg",
+                  textVisible 
+                    ? "opacity-100 translate-y-0" 
+                    : "opacity-0 translate-y-4"
                 )}
                 style={{
-                  textShadow: "0 1px 5px rgba(0,0,0,0.5)",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                  transitionDelay: textVisible ? "600ms" : "0ms",
                 }}
               >
                 {displayScene.subtext}
@@ -464,18 +684,23 @@ export const PreviewPlayer = ({
         </div>
       )}
 
-      {/* Transition Indicator */}
-      {inTransitionPhase && isPlaying && (
-        <div className="absolute top-4 left-4 z-30 px-2 py-1 rounded bg-background/70 backdrop-blur-sm text-xs text-muted-foreground capitalize">
-          {transitionType.replace("-", " ")}
+      {/* Transition Indicator with Progress Ring */}
+      {isPlaying && (
+        <div className="absolute top-4 left-4 z-30 flex items-center gap-3">
+          <ProgressRing progress={currentSceneProgress} size={40} />
+          <div className="px-3 py-1.5 rounded-lg bg-background/70 backdrop-blur-sm">
+            <span className="text-xs font-medium text-foreground capitalize">
+              {transitionType.replace("-", " ")}
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Scene Progress Indicator */}
+      {/* Scene Progress Bar (bottom) */}
       {isPlaying && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-background/50 z-30">
           <div
-            className="h-full bg-primary transition-all duration-100"
+            className="h-full bg-gradient-to-r from-primary to-primary/80 transition-all duration-100"
             style={{ width: `${currentSceneProgress * 100}%` }}
           />
         </div>
@@ -487,7 +712,7 @@ export const PreviewPlayer = ({
         className="absolute inset-0 z-40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity group"
       >
         <div className={cn(
-          "rounded-full bg-primary/90 flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg",
+          "rounded-full bg-primary/90 flex items-center justify-center transform group-hover:scale-110 transition-transform shadow-lg backdrop-blur-sm",
           isFullscreen ? "w-24 h-24" : "w-16 h-16"
         )}>
           {isPlaying ? (
@@ -530,7 +755,7 @@ export const PreviewPlayer = ({
             <Maximize className="w-4 h-4 text-foreground" />
           )}
         </button>
-        <div className="px-3 py-1 rounded-full bg-background/70 backdrop-blur-sm text-xs text-foreground">
+        <div className="px-3 py-1 rounded-full bg-background/70 backdrop-blur-sm text-xs text-foreground font-medium">
           Scene {currentSceneIndex + 1} / {scenes.length}
         </div>
       </div>
