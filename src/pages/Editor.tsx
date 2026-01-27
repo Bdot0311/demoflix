@@ -40,6 +40,8 @@ import {
   Smartphone,
   Square,
   ChevronDown,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -455,6 +457,99 @@ const Editor = () => {
     setSceneHistory(newScenes);
 
     await supabase.from("scenes").update(updates).eq("id", sceneId);
+  };
+
+  const handleAddScene = async () => {
+    if (!project) return;
+
+    const newOrderIndex = scenes.length;
+    const defaultDuration = project.duration ? Math.floor((project.duration * 1000) / Math.max(scenes.length + 1, 1)) : 5000;
+    
+    // Use the first asset if available, otherwise null
+    const assetId = assets[0]?.id || null;
+
+    const newScene = {
+      project_id: project.id,
+      asset_id: assetId,
+      order_index: newOrderIndex,
+      headline: `Scene ${newOrderIndex + 1}`,
+      subtext: "",
+      duration_ms: Math.min(defaultDuration, 5000),
+      transition: "fade",
+      zoom_level: 1.0,
+      pan_x: 0,
+      pan_y: 0,
+    };
+
+    const { data: insertedScene, error } = await supabase
+      .from("scenes")
+      .insert(newScene)
+      .select("*, asset:assets(*)")
+      .single();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add scene.",
+      });
+      return;
+    }
+
+    if (insertedScene) {
+      const newScenes = [...scenes, insertedScene];
+      setScenes(newScenes);
+      setSceneHistory(newScenes);
+      setSelectedScene(insertedScene.id);
+      toast({
+        title: "Scene added",
+        description: "New scene has been added to your project.",
+      });
+    }
+  };
+
+  const handleDeleteScene = async (sceneId: string) => {
+    if (scenes.length <= 1) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete",
+        description: "You must have at least one scene.",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("scenes").delete().eq("id", sceneId);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete scene.",
+      });
+      return;
+    }
+
+    const newScenes = scenes
+      .filter((s) => s.id !== sceneId)
+      .map((s, index) => ({ ...s, order_index: index }));
+
+    setScenes(newScenes);
+    setSceneHistory(newScenes);
+
+    // Update order_index in database
+    for (const scene of newScenes) {
+      await supabase.from("scenes").update({ order_index: scene.order_index }).eq("id", scene.id);
+    }
+
+    // Select the first scene if the deleted one was selected
+    if (selectedScene === sceneId) {
+      setSelectedScene(newScenes[0]?.id || null);
+    }
+
+    toast({
+      title: "Scene deleted",
+      description: "Scene has been removed from your project.",
+    });
   };
 
   const handleSave = async () => {
@@ -917,9 +1012,20 @@ const Editor = () => {
       <div className="flex-1 flex">
         {/* Left Sidebar - Scene List */}
         <div className="w-72 border-r border-border/50 bg-card/30 p-4 overflow-y-auto">
-          <h3 className="text-sm font-semibold text-muted-foreground mb-4 uppercase tracking-wider">
-            Scenes (drag to reorder)
-          </h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Scenes
+            </h3>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleAddScene}
+              className="h-7 px-2 text-xs"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+          </div>
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -938,6 +1044,8 @@ const Editor = () => {
                     index={index}
                     isSelected={selectedScene === scene.id}
                     onSelect={() => setSelectedScene(scene.id)}
+                    onDelete={() => handleDeleteScene(scene.id)}
+                    canDelete={scenes.length > 1}
                   />
                 ))}
               </div>

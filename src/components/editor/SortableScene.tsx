@@ -1,6 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Scene {
   id: string;
@@ -15,9 +16,18 @@ interface SortableSceneProps {
   index: number;
   isSelected: boolean;
   onSelect: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
 }
 
-export const SortableScene = ({ scene, index, isSelected, onSelect }: SortableSceneProps) => {
+export const SortableScene = ({ 
+  scene, 
+  index, 
+  isSelected, 
+  onSelect, 
+  onDelete, 
+  canDelete = true 
+}: SortableSceneProps) => {
   const {
     attributes,
     listeners,
@@ -32,12 +42,17 @@ export const SortableScene = ({ scene, index, isSelected, onSelect }: SortableSc
     transition: transition || "transform 200ms ease",
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.();
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
+      className={`group w-full p-3 rounded-xl text-left transition-all flex items-center gap-3 ${
         isSelected
           ? "bg-primary/20 border border-primary/50"
           : "bg-muted/30 border border-transparent hover:bg-muted/50"
@@ -58,6 +73,16 @@ export const SortableScene = ({ scene, index, isSelected, onSelect }: SortableSc
           {(scene.duration_ms / 1000).toFixed(1)}s
         </div>
       </div>
+      {canDelete && onDelete && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+          onClick={handleDelete}
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      )}
     </div>
   );
 };
