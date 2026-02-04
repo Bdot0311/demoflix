@@ -297,7 +297,7 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full bg-black rounded-lg overflow-hidden group",
+        "relative w-full max-w-full bg-black rounded-lg overflow-hidden group",
         isFullscreen ? "fixed inset-0 z-50" : "aspect-video"
       )}
       onMouseMove={handleMouseMove}
