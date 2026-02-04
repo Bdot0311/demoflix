@@ -1,6 +1,6 @@
 # DemoFlix: Migrate to Remotion + Claude for Motion-Style Demos
 
-## Status: Phases 1-3 Complete ✅
+## Status: Phases 1-5 Complete ✅
 
 ### Completed ✅
 
@@ -23,26 +23,33 @@
 - Motion config auto-selected based on scene_type (hook, tension, reveal, feature, benefit, climax, cta)
 - Deployed updated edge function
 
-**Phase 5 (Partial): Remotion Preview Component**
-- Created `RemotionPreview.tsx` wrapper component
-- Bridges database scene format with Remotion's format
-- Full playback controls (play, pause, seek, fullscreen)
-- Music synchronization
-- Scene navigation dots
-
-### In Progress 🔄
-
-**Phase 4: Remotion Lambda Integration** (Requires AWS Setup)
-- [ ] Create `render-remotion` edge function
-- [ ] Create `remotion-webhook` edge function  
-- [ ] User must provide AWS credentials
-
-### Remaining ⏳
+**Phase 4: Remotion Lambda Integration**
+- Created `render-remotion` edge function - triggers Lambda or falls back to Shotstack
+- Created `remotion-webhook` edge function - handles completion callbacks
+- Created `check-remotion-status` edge function - polls render progress
+- Supports dev mode with simulated progress when AWS not configured
 
 **Phase 5: Unified Preview & Render**
-- [ ] Integrate RemotionPreview into Editor (replace PreviewPlayer)
-- [ ] Add toggle to switch between legacy and Remotion preview
-- [ ] Update RenderPage to use Remotion Lambda
+- Created `RemotionPreview.tsx` wrapper component with full playback controls
+- Integrated RemotionPreview into Editor with toggle switch
+- Updated RenderPage to use Remotion renderer (with Shotstack fallback)
+- WYSIWYG: Preview now matches rendered output
+
+---
+
+## AWS Setup Required
+
+To enable production video rendering, you need to provide these secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key |
+| `REMOTION_AWS_REGION` | Lambda region (default: us-east-1) |
+| `REMOTION_FUNCTION_NAME` | Your deployed Lambda function name |
+| `REMOTION_SERVE_URL` | S3 URL where Remotion bundle is hosted |
+
+Without these, the system falls back to Shotstack or development simulation mode.
 
 ---
 
@@ -62,26 +69,21 @@ src/remotion/
     └── animations.ts                ✅ Spring configs, types, helpers
 
 src/components/editor/
-├── PreviewPlayer.tsx                 (Legacy - CSS animations)
+├── PreviewPlayer.tsx                ✅ Legacy CSS preview (kept as fallback)
 └── RemotionPreview.tsx              ✅ New Remotion-based preview
+
+src/pages/
+├── Editor.tsx                       ✅ Toggle between CSS and Remotion preview
+└── RenderPage.tsx                   ✅ Uses Remotion renderer
 
 supabase/functions/
 ├── generate-storyboard/             ✅ Enhanced with motion config
-├── render-video/                    (Legacy - Shotstack)
-└── check-render-status/             (Legacy - Shotstack)
+├── render-remotion/                 ✅ Remotion Lambda trigger
+├── check-remotion-status/           ✅ Polls Remotion progress
+├── remotion-webhook/                ✅ Handles Lambda callbacks
+├── render-video/                    (Legacy - Shotstack fallback)
+└── check-render-status/             (Legacy - Shotstack fallback)
 ```
-
----
-
-## Next Steps
-
-1. **Test RemotionPreview** - Import into Editor and verify animations work
-2. **Set up AWS Lambda** (Phase 4) - User must:
-   - Deploy Remotion Lambda to AWS
-   - Provide AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-   - Provide REMOTION_AWS_REGION, REMOTION_FUNCTION_NAME
-3. **Create render-remotion edge function** - Trigger Lambda renders
-4. **Replace PreviewPlayer** - Switch Editor to use RemotionPreview
 
 ---
 
@@ -115,3 +117,14 @@ interface MotionConfig {
 | benefit | bounce-in | particles, vignette | slide-left |
 | climax | word-stagger | all effects | zoom |
 | cta | fade-scale | glow, vignette | fade |
+
+### Renderer Fallback Logic
+
+```
+render-remotion called
+├── AWS configured? → Trigger Remotion Lambda
+│   └── Status via check-remotion-status
+│   └── Completion via remotion-webhook
+└── AWS not configured? → Fall back to render-video (Shotstack)
+    └── Status via check-render-status
+```

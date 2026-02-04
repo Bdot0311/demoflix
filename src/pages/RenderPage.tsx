@@ -28,6 +28,7 @@ const RenderPage = () => {
   const [project, setProject] = useState<any>(null);
   const [renderId, setRenderId] = useState<string | null>(null);
   const [shotstackRenderIds, setShotstackRenderIds] = useState<any>(null);
+  const [renderer, setRenderer] = useState<"remotion" | "shotstack" | "remotion-dev">("remotion");
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
 
@@ -70,8 +71,8 @@ const RenderPage = () => {
       if (renderError) throw renderError;
       setRenderId(render.id);
 
-      // Start the actual render
-      const { data, error: fnError } = await supabase.functions.invoke("render-video", {
+      // Start the actual render - try Remotion first, falls back to Shotstack
+      const { data, error: fnError } = await supabase.functions.invoke("render-remotion", {
         body: { projectId, renderId: render.id },
       });
 
@@ -81,7 +82,10 @@ const RenderPage = () => {
         throw new Error(data.error);
       }
 
+      // Store render IDs (works for both Remotion and Shotstack fallback)
+      const renderIdKey = data.renderer === "shotstack" ? "shotstackRenderIds" : "remotionRenderIds";
       setShotstackRenderIds(data.renderIds);
+      setRenderer(data.renderer || "remotion");
       setIsStarting(false);
       setProgress(10);
 
@@ -102,8 +106,15 @@ const RenderPage = () => {
 
     const checkStatus = async () => {
       try {
-        const { data, error: fnError } = await supabase.functions.invoke("check-render-status", {
-          body: { renderId, shotstackRenderIds },
+        // Use the appropriate status checker based on renderer
+        const statusFunction = renderer === "shotstack" 
+          ? "check-render-status" 
+          : "check-remotion-status";
+        
+        const bodyKey = renderer === "shotstack" ? "shotstackRenderIds" : "remotionRenderIds";
+        
+        const { data, error: fnError } = await supabase.functions.invoke(statusFunction, {
+          body: { renderId, [bodyKey]: shotstackRenderIds },
         });
 
         if (fnError) throw fnError;
@@ -119,7 +130,9 @@ const RenderPage = () => {
 
           toast({
             title: "Trailer complete!",
-            description: "Your Netflix-style trailer is ready to view.",
+            description: renderer === "remotion-dev" 
+              ? "Development mode complete. Configure AWS for real renders."
+              : "Your Netflix-style trailer is ready to view.",
           });
 
           setTimeout(() => {
@@ -144,7 +157,7 @@ const RenderPage = () => {
     // Check every 3 seconds
     const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
-  }, [renderId, shotstackRenderIds, projectId, navigate, toast, error]);
+  }, [renderId, shotstackRenderIds, projectId, navigate, toast, error, renderer]);
 
   // Start render on mount
   useEffect(() => {
