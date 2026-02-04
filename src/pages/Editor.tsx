@@ -65,6 +65,7 @@ import { RemotionPreview } from "@/components/editor/RemotionPreview";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
 import { MusicSelector } from "@/components/editor/MusicSelector";
 import { BrandingPanel } from "@/components/editor/BrandingPanel";
+import { VoiceoverPanel } from "@/components/editor/VoiceoverPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface Scene {
@@ -149,6 +150,7 @@ const Editor = () => {
   const [musicRecommendations, setMusicRecommendations] = useState<MusicRecommendation[]>([]);
   const [storyboardMood, setStoryboardMood] = useState<string | null>(null);
   const [useRemotionPreview, setUseRemotionPreview] = useState(true);
+  const [voiceoverUrl, setVoiceoverUrl] = useState<string | null>(null);
 
   // History for undo/redo
   const {
@@ -649,10 +651,11 @@ const Editor = () => {
           headline: aiScene.headline || `Scene ${index + 1}`,
           subtext: aiScene.subtext || "",
           duration_ms: aiScene.duration_ms,
-          transition: aiScene.scene_type === "hook" ? "fade" : "slideLeft",
+          transition: aiScene.transition || (aiScene.scene_type === "hook" ? "fade" : "slide-left"),
           zoom_level: aiScene.zoom_level || 1.2,
-          pan_x: aiScene.pan_direction === "left" ? -0.1 : aiScene.pan_direction === "right" ? 0.1 : 0,
-          pan_y: aiScene.pan_direction === "up" ? -0.1 : aiScene.pan_direction === "down" ? 0.1 : 0,
+          pan_x: aiScene.pan_direction === "left" ? -5 : aiScene.pan_direction === "right" ? 5 : 0,
+          pan_y: aiScene.pan_direction === "up" ? -3 : aiScene.pan_direction === "down" ? 3 : 0,
+          motion_config: aiScene.motion_config || null,
         }));
 
         const { data: insertedScenes } = await supabase
@@ -1254,6 +1257,19 @@ const Editor = () => {
                     show_logo_on_all_scenes: project.show_logo_on_all_scenes || false,
                   }}
                   onUpdate={handleBrandingUpdate}
+                  disabled={scenes.length === 0}
+                />
+              )}
+
+              {/* Voiceover Panel */}
+              {project && (
+                <VoiceoverPanel
+                  projectId={project.id}
+                  projectStyle={project.style}
+                  scenes={scenes}
+                  voiceoverUrl={voiceoverUrl}
+                  onVoiceoverGenerated={setVoiceoverUrl}
+                  onVoiceoverRemoved={() => setVoiceoverUrl(null)}
                   disabled={scenes.length === 0}
                 />
               )}

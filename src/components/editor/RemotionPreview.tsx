@@ -16,6 +16,41 @@ interface DBScene {
   zoom_level?: number;
   pan_x?: number;
   pan_y?: number;
+  motion_config?: {
+    animation_style?: string;
+    spring?: {
+      damping: number;
+      mass: number;
+      stiffness: number;
+      overshootClamping: boolean;
+    };
+    stagger_delay_frames?: number;
+    entrance_delay_frames?: number;
+    effects?: string[];
+    cursor_path?: {
+      startX: number;
+      startY: number;
+      endX: number;
+      endY: number;
+      clickFrame?: number;
+    };
+    zoom_targets?: Array<{
+      x: number;
+      y: number;
+      scale: number;
+      startFrame: number;
+      endFrame: number;
+    }>;
+    ui_highlights?: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      label?: string;
+      delay: number;
+      duration: number;
+    }>;
+  };
   asset?: {
     file_url: string;
     file_type: string;
@@ -49,6 +84,37 @@ const convertToRemotionScene = (
   fallbackAsset?: { file_url: string; file_type: string }
 ): SceneData => {
   const asset = scene.asset || fallbackAsset;
+  const storedConfig = scene.motion_config;
+  
+  // Build motion config from stored data or use defaults
+  const motionConfig = storedConfig ? {
+    animation_style: (storedConfig.animation_style || "bounce-in") as any,
+    spring: storedConfig.spring || springPresets.bouncy,
+    stagger_delay_frames: storedConfig.stagger_delay_frames || 2,
+    entrance_delay_frames: storedConfig.entrance_delay_frames || 10,
+    effects: (storedConfig.effects || ["vignette", "glow", "particles"]) as any,
+    camera: {
+      zoom_start: 1.0,
+      zoom_end: scene.zoom_level || 1.15,
+      pan_x: scene.pan_x || 0,
+      pan_y: scene.pan_y || 0,
+    },
+    // Include demo-style effects from stored config
+    cursor_path: storedConfig.cursor_path,
+    zoom_targets: storedConfig.zoom_targets,
+    ui_highlights: storedConfig.ui_highlights,
+  } : {
+    ...defaultMotionConfig,
+    animation_style: "bounce-in" as const,
+    spring: springPresets.bouncy,
+    effects: ["vignette", "glow", "particles"] as any,
+    camera: {
+      zoom_start: 1.0,
+      zoom_end: scene.zoom_level || 1.15,
+      pan_x: scene.pan_x || 0,
+      pan_y: scene.pan_y || 0,
+    },
+  };
   
   return {
     id: scene.id,
@@ -56,18 +122,7 @@ const convertToRemotionScene = (
     subtext: scene.subtext || "",
     imageUrl: asset?.file_url || "",
     durationInFrames: Math.round((scene.duration_ms / 1000) * FPS),
-    motionConfig: {
-      ...defaultMotionConfig,
-      animation_style: "bounce-in",
-      spring: springPresets.bouncy,
-      effects: ["vignette", "glow", "particles"],
-      camera: {
-        zoom_start: 1.0,
-        zoom_end: scene.zoom_level || 1.15,
-        pan_x: scene.pan_x || 0,
-        pan_y: scene.pan_y || 0,
-      },
-    },
+    motionConfig,
     transition: mapTransition(scene.transition),
   };
 };
