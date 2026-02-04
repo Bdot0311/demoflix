@@ -5,6 +5,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface CursorPath {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  clickFrame?: number;
+}
+
+interface ZoomTarget {
+  x: number;
+  y: number;
+  scale: number;
+  startFrame: number;
+  endFrame: number;
+}
+
+interface UIHighlight {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+  delay: number;
+  duration: number;
+}
+
 interface MotionConfig {
   animation_style: "bounce-in" | "typewriter" | "slide-mask" | "fade-scale" | "word-stagger";
   spring: {
@@ -16,6 +42,9 @@ interface MotionConfig {
   stagger_delay_frames: number;
   entrance_delay_frames: number;
   effects: ("particles" | "vignette" | "glow" | "scanlines")[];
+  cursor_path?: CursorPath;
+  zoom_targets?: ZoomTarget[];
+  ui_highlights?: UIHighlight[];
 }
 
 interface SceneData {
@@ -37,6 +66,48 @@ const springPresets = {
   smooth: { damping: 30, mass: 1, stiffness: 80, overshootClamping: true },
   gentle: { damping: 25, mass: 1.5, stiffness: 60, overshootClamping: false },
   elastic: { damping: 8, mass: 0.8, stiffness: 150, overshootClamping: false },
+};
+
+// Generate cursor paths and zoom targets for demo-style scenes
+const generateDemoEffects = (sceneType: string, sceneIndex: number, durationFrames: number): Partial<MotionConfig> => {
+  const effects: Partial<MotionConfig> = {};
+  
+  // Add cursor animation for feature and reveal scenes
+  if (sceneType === "feature" || sceneType === "reveal") {
+    effects.cursor_path = {
+      startX: 100,
+      startY: 100,
+      endX: 500 + (sceneIndex * 50) % 300,
+      endY: 300 + (sceneIndex * 30) % 200,
+      clickFrame: Math.floor(durationFrames * 0.7),
+    };
+  }
+  
+  // Add zoom targets for tension and climax scenes
+  if (sceneType === "tension" || sceneType === "climax") {
+    effects.zoom_targets = [{
+      x: 50 + (sceneIndex * 10) % 30,
+      y: 40 + (sceneIndex * 5) % 20,
+      scale: 1.8,
+      startFrame: Math.floor(durationFrames * 0.2),
+      endFrame: Math.floor(durationFrames * 0.8),
+    }];
+  }
+  
+  // Add UI highlights for benefit scenes
+  if (sceneType === "benefit" || sceneType === "feature") {
+    effects.ui_highlights = [{
+      x: 300 + (sceneIndex * 100) % 400,
+      y: 200 + (sceneIndex * 50) % 200,
+      width: 200,
+      height: 60,
+      label: sceneIndex === 0 ? undefined : "Key Feature",
+      delay: 15,
+      duration: durationFrames - 30,
+    }];
+  }
+  
+  return effects;
 };
 
 // Map scene type to recommended animation style and effects
@@ -344,17 +415,27 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
       });
     }
 
-    // Enhance scenes with motion config and transitions
+    // Enhance scenes with motion config, transitions, and demo effects
+    const fps = 30;
     const enhancedScenes: SceneData[] = scenes.map((scene, i) => {
       const sceneType = scene.scene_type || "feature";
-      const motionConfig = getMotionConfigForSceneType(sceneType, i, targetSceneCount);
+      const baseMotionConfig = getMotionConfigForSceneType(sceneType, i, targetSceneCount);
       const transition = getTransitionForSceneType(sceneType, i);
+      const durationMs = scene.duration_ms || sceneDuration;
+      const durationFrames = Math.floor((durationMs / 1000) * fps);
+      
+      // Add demo-style effects (cursor, zoom, highlights)
+      const demoEffects = generateDemoEffects(sceneType, i, durationFrames);
+      const motionConfig: MotionConfig = {
+        ...baseMotionConfig,
+        ...demoEffects,
+      };
 
       return {
         order_index: scene.order_index ?? i,
         headline: scene.headline || "POWER",
         subtext: scene.subtext || "",
-        duration_ms: scene.duration_ms || sceneDuration,
+        duration_ms: durationMs,
         scene_type: sceneType,
         zoom_level: scene.zoom_level || 1.2,
         pan_direction: scene.pan_direction || "center",

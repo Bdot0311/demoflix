@@ -25,6 +25,32 @@ export const cameraConfigSchema = z.object({
   pan_y: z.number(),
 });
 
+export const cursorPathSchema = z.object({
+  startX: z.number(),
+  startY: z.number(),
+  endX: z.number(),
+  endY: z.number(),
+  clickFrame: z.number().optional(),
+});
+
+export const zoomTargetSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  scale: z.number(),
+  startFrame: z.number(),
+  endFrame: z.number(),
+});
+
+export const uiHighlightSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+  label: z.string().optional(),
+  delay: z.number(),
+  duration: z.number(),
+});
+
 export const motionConfigSchema = z.object({
   animation_style: z.enum(["bounce-in", "typewriter", "slide-mask", "fade-scale", "word-stagger"]),
   spring: springConfigSchema,
@@ -32,6 +58,9 @@ export const motionConfigSchema = z.object({
   entrance_delay_frames: z.number(),
   effects: z.array(z.enum(["particles", "vignette", "glow", "scanlines"])),
   camera: cameraConfigSchema,
+  cursor_path: cursorPathSchema.optional(),
+  zoom_targets: z.array(zoomTargetSchema).optional(),
+  ui_highlights: z.array(uiHighlightSchema).optional(),
 });
 
 export const sceneDataSchema = z.object({

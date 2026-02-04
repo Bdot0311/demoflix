@@ -14,6 +14,8 @@ import {
   ScanLines,
   AccentLine,
 } from "./MotionOverlays";
+import { DemoCursor } from "./CursorAnimation";
+import { ZoomHighlight, UIHighlight, CalloutBox } from "./ZoomHighlight";
 import { getKenBurnsTransform, SceneData, springPresets } from "../lib/animations";
 
 interface SceneProps {
@@ -136,6 +138,32 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
       {hasGlow && <GlowEffect color="#8B5CF6" intensity={0.3} />}
       {hasVignette && <Vignette intensity={0.6} />}
       {hasScanlines && <ScanLines opacity={0.02} />}
+
+      {/* Demo-style cursor animation */}
+      {motionConfig.cursor_path && (
+        <DemoCursor
+          startX={motionConfig.cursor_path.startX}
+          startY={motionConfig.cursor_path.startY}
+          endX={motionConfig.cursor_path.endX}
+          endY={motionConfig.cursor_path.endY}
+          clickFrame={motionConfig.cursor_path.clickFrame}
+          delay={20}
+        />
+      )}
+
+      {/* UI Highlights */}
+      {motionConfig.ui_highlights?.map((highlight, idx) => (
+        <UIHighlight
+          key={idx}
+          x={highlight.x}
+          y={highlight.y}
+          width={highlight.width}
+          height={highlight.height}
+          label={highlight.label}
+          delay={highlight.delay}
+          duration={highlight.duration}
+        />
+      ))}
 
       {/* Text content */}
       <AbsoluteFill className="flex flex-col items-center justify-center px-16">
