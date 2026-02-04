@@ -27,6 +27,7 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [isScrapingUrl, setIsScrapingUrl] = useState(false);
+  const [scrapeProgress, setScrapeProgress] = useState({ current: 0, total: 0, status: "" });
   const { toast } = useToast();
 
   const addFiles = useCallback((newFiles: File[], sourceUrl?: string) => {
@@ -131,8 +132,11 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
     }
 
     setIsScrapingUrl(true);
+    setScrapeProgress({ current: 0, total: 0, status: "Connecting to website..." });
 
     try {
+      setScrapeProgress({ current: 0, total: 0, status: "Mapping website pages..." });
+      
       const { data, error } = await supabase.functions.invoke('scrape-website', {
         body: { url: formattedUrl },
       });
@@ -144,6 +148,8 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
       }
 
       const hostname = new URL(formattedUrl).hostname.replace(/[^a-z0-9]/gi, '-');
+      const totalPages = data.pages?.length || (data.screenshot ? 1 : 0);
+      setScrapeProgress({ current: 0, total: totalPages, status: "Downloading screenshots..." });
       const filesToAdd: File[] = [];
       
       // Helper to download screenshot (URL or base64)
@@ -172,15 +178,22 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
 
       // Process ALL pages from the scrape (not just the main screenshot)
       if (data.pages && Array.isArray(data.pages) && data.pages.length > 0) {
-        const pagePromises = data.pages.map(async (page: any, index: number) => {
-          if (!page.screenshot) return null;
+        // Process pages sequentially to show real-time progress
+        for (let index = 0; index < data.pages.length; index++) {
+          const page = data.pages[index];
+          if (!page.screenshot) continue;
+          
           const pageName = page.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || `page-${index}`;
+          setScrapeProgress({ 
+            current: index + 1, 
+            total: data.pages.length, 
+            status: `Downloading: ${page.title || pageName}` 
+          });
+          
           const filename = `${hostname}-${pageName}.png`;
-          return downloadScreenshot(page.screenshot, filename);
-        });
-        
-        const downloadedFiles = await Promise.all(pagePromises);
-        filesToAdd.push(...downloadedFiles.filter((f): f is File => f !== null));
+          const file = await downloadScreenshot(page.screenshot, filename);
+          if (file) filesToAdd.push(file);
+        }
       } else if (data.screenshot) {
         // Fallback to single screenshot if no pages array
         const file = await downloadScreenshot(data.screenshot, `${hostname}-screenshot.png`);
@@ -215,6 +228,7 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
       });
     } finally {
       setIsScrapingUrl(false);
+      setScrapeProgress({ current: 0, total: 0, status: "" });
     }
   };
 
@@ -248,9 +262,38 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
             )}
           </Button>
         </form>
-        <p className="text-xs text-muted-foreground">
-          Enter any website URL to capture a screenshot for your video
-        </p>
+        
+        {/* Real-time scraping progress */}
+        {isScrapingUrl && (
+          <div className="mt-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              <span className="text-sm font-medium text-foreground">
+                {scrapeProgress.total > 0 
+                  ? `Capturing page ${scrapeProgress.current} of ${scrapeProgress.total}`
+                  : scrapeProgress.status
+                }
+              </span>
+            </div>
+            {scrapeProgress.total > 0 && (
+              <>
+                <Progress 
+                  value={(scrapeProgress.current / scrapeProgress.total) * 100} 
+                  className="h-2 mb-1"
+                />
+                <p className="text-xs text-muted-foreground truncate">
+                  {scrapeProgress.status}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+        
+        {!isScrapingUrl && (
+          <p className="text-xs text-muted-foreground">
+            Enter any website URL to capture multiple page screenshots
+          </p>
+        )}
       </div>
 
       <div className="relative">
