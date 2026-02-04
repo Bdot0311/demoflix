@@ -5,6 +5,7 @@ import {
   interpolate,
   Img,
   AbsoluteFill,
+  spring,
 } from "remotion";
 import { KineticText, SubText } from "./KineticText";
 import {
@@ -15,7 +16,7 @@ import {
   AccentLine,
 } from "./MotionOverlays";
 import { DemoCursor } from "./CursorAnimation";
-import { ZoomHighlight, UIHighlight, CalloutBox } from "./ZoomHighlight";
+import { UIHighlight, CalloutBox } from "./ZoomHighlight";
 import { getKenBurnsTransform, SceneData, springPresets } from "../lib/animations";
 
 interface SceneProps {
@@ -23,6 +24,106 @@ interface SceneProps {
   isFirst?: boolean;
   isLast?: boolean;
 }
+
+// Zoom Spotlight overlay component - shows focus area during zoom targets
+const ZoomSpotlight: React.FC<{
+  x: number;
+  y: number;
+  scale: number;
+  startFrame: number;
+  endFrame: number;
+  highlightColor?: string;
+}> = ({ x, y, scale, startFrame, endFrame, highlightColor = "#8B5CF6" }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  if (frame < startFrame || frame > endFrame) return null;
+
+  const localFrame = frame - startFrame;
+  const duration = endFrame - startFrame;
+  const enterDuration = Math.min(15, duration / 3);
+  const exitDuration = Math.min(15, duration / 3);
+
+  let opacity = 1;
+  let ringScale = 1;
+
+  if (localFrame < enterDuration) {
+    const progress = spring({
+      frame: localFrame,
+      fps,
+      config: { damping: 15, mass: 0.8, stiffness: 150 },
+    });
+    opacity = progress;
+    ringScale = interpolate(progress, [0, 1], [0.5, 1]);
+  } else if (localFrame > duration - exitDuration) {
+    const exitFrame = localFrame - (duration - exitDuration);
+    const progress = spring({
+      frame: exitFrame,
+      fps,
+      config: { damping: 15, mass: 0.8, stiffness: 150 },
+    });
+    opacity = 1 - progress;
+    ringScale = interpolate(progress, [0, 1], [1, 1.2]);
+  }
+
+  // Pulsing glow effect
+  const pulsePhase = (localFrame / 15) % 1;
+  const glowIntensity = 0.6 + Math.sin(pulsePhase * Math.PI * 2) * 0.3;
+
+  return (
+    <>
+      {/* Radial spotlight vignette */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(circle at ${x}% ${y}%, transparent 15%, rgba(0,0,0,${0.4 * opacity}) 50%, rgba(0,0,0,${0.7 * opacity}) 100%)`,
+          pointerEvents: "none",
+          zIndex: 40,
+        }}
+      />
+
+      {/* Focus ring */}
+      <div
+        style={{
+          position: "absolute",
+          left: `${x}%`,
+          top: `${y}%`,
+          transform: `translate(-50%, -50%) scale(${ringScale})`,
+          opacity,
+          zIndex: 45,
+        }}
+      >
+        <div
+          style={{
+            width: 120,
+            height: 120,
+            borderRadius: "50%",
+            border: `3px solid ${highlightColor}`,
+            boxShadow: `0 0 ${30 * glowIntensity}px ${highlightColor}, inset 0 0 ${20 * glowIntensity}px ${highlightColor}30`,
+          }}
+        />
+        
+        {/* Corner brackets */}
+        {[0, 90, 180, 270].map((rotation) => (
+          <div
+            key={rotation}
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              width: 20,
+              height: 3,
+              background: highlightColor,
+              transform: `translate(-50%, -50%) rotate(${rotation}deg) translateX(70px)`,
+              boxShadow: `0 0 10px ${highlightColor}`,
+            }}
+          />
+        ))}
+      </div>
+    </>
+  );
+};
 
 export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
   const frame = useCurrentFrame();
@@ -139,6 +240,18 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
       {hasVignette && <Vignette intensity={0.6} />}
       {hasScanlines && <ScanLines opacity={0.02} />}
 
+      {/* Zoom target spotlights */}
+      {motionConfig.zoom_targets?.map((target, idx) => (
+        <ZoomSpotlight
+          key={`zoom-${idx}`}
+          x={target.x}
+          y={target.y}
+          scale={target.scale}
+          startFrame={target.startFrame}
+          endFrame={target.endFrame}
+        />
+      ))}
+
       {/* Demo-style cursor animation */}
       {motionConfig.cursor_path && (
         <DemoCursor
@@ -154,7 +267,7 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
       {/* UI Highlights */}
       {motionConfig.ui_highlights?.map((highlight, idx) => (
         <UIHighlight
-          key={idx}
+          key={`highlight-${idx}`}
           x={highlight.x}
           y={highlight.y}
           width={highlight.width}

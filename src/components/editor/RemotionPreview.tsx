@@ -243,6 +243,22 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
     }
   }, [remotionScenes, currentSceneIndex, onTimeUpdate, onSceneChange]);
 
+  // Subscribe to player frame updates via timeupdate event
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const onTimeUpdate = (e: { detail: { frame: number } }) => {
+      handleFrameUpdate(e.detail.frame);
+    };
+
+    player.addEventListener("timeupdate", onTimeUpdate as any);
+
+    return () => {
+      player.removeEventListener("timeupdate", onTimeUpdate as any);
+    };
+  }, [handleFrameUpdate]);
+
   // Sync music with playback
   useEffect(() => {
     if (!musicUrl) return;
