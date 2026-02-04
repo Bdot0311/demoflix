@@ -143,42 +143,69 @@ export const FileUploadZone = ({ files, setFiles, maxFiles = 20 }: FileUploadZon
         throw new Error(data.error || 'Failed to scrape website');
       }
 
-      // Create filename from URL
       const hostname = new URL(formattedUrl).hostname.replace(/[^a-z0-9]/gi, '-');
-      const filename = `${hostname}-screenshot.png`;
+      const filesToAdd: File[] = [];
       
-      let file: File;
-      const screenshotData = data.screenshot;
-      
-      // Check if screenshot is a URL or base64
-      if (screenshotData.startsWith('http://') || screenshotData.startsWith('https://')) {
-        // Fetch the image from URL
-        const imageResponse = await fetch(screenshotData);
-        if (!imageResponse.ok) {
-          throw new Error('Failed to download screenshot from URL');
+      // Helper to download screenshot (URL or base64)
+      const downloadScreenshot = async (screenshotData: string, filename: string): Promise<File | null> => {
+        try {
+          if (screenshotData.startsWith('http://') || screenshotData.startsWith('https://')) {
+            const imageResponse = await fetch(screenshotData);
+            if (!imageResponse.ok) return null;
+            const blob = await imageResponse.blob();
+            return new File([blob], filename, { type: blob.type || 'image/png' });
+          } else {
+            // Handle base64 data
+            const byteString = atob(screenshotData);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], { type: 'image/png' });
+            return new File([blob], filename, { type: 'image/png' });
+          }
+        } catch {
+          return null;
         }
-        const blob = await imageResponse.blob();
-        file = new File([blob], filename, { type: blob.type || 'image/png' });
-      } else {
-        // Handle base64 data (legacy support)
-        const byteString = atob(screenshotData);
-        const mimeType = 'image/png';
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-        }
-        const blob = new Blob([ab], { type: mimeType });
-        file = new File([blob], filename, { type: mimeType });
+      };
+
+      // Process ALL pages from the scrape (not just the main screenshot)
+      if (data.pages && Array.isArray(data.pages) && data.pages.length > 0) {
+        const pagePromises = data.pages.map(async (page: any, index: number) => {
+          if (!page.screenshot) return null;
+          const pageName = page.title?.toLowerCase().replace(/[^a-z0-9]/g, '-') || `page-${index}`;
+          const filename = `${hostname}-${pageName}.png`;
+          return downloadScreenshot(page.screenshot, filename);
+        });
+        
+        const downloadedFiles = await Promise.all(pagePromises);
+        filesToAdd.push(...downloadedFiles.filter((f): f is File => f !== null));
+      } else if (data.screenshot) {
+        // Fallback to single screenshot if no pages array
+        const file = await downloadScreenshot(data.screenshot, `${hostname}-screenshot.png`);
+        if (file) filesToAdd.push(file);
       }
 
-      addFiles([file], formattedUrl);
-      setUrlInput("");
+      // Limit to available slots
+      const availableSlots = maxFiles - files.length;
+      const filesToUpload = filesToAdd.slice(0, availableSlots);
+      
+      if (filesToUpload.length > 0) {
+        addFiles(filesToUpload, formattedUrl);
+        setUrlInput("");
 
-      toast({
-        title: "Website captured!",
-        description: `Screenshot of ${data.metadata?.title || formattedUrl} added`,
-      });
+        toast({
+          title: "Website captured!",
+          description: `${filesToUpload.length} page screenshot${filesToUpload.length > 1 ? 's' : ''} from ${data.metadata?.title || formattedUrl} added`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No screenshots captured",
+          description: "Could not capture any page screenshots",
+        });
+      }
     } catch (error: any) {
       console.error('Error scraping URL:', error);
       toast({
