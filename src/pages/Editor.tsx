@@ -1069,9 +1069,9 @@ const Editor = () => {
         </div>
 
         {/* Main Preview Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Preview */}
-          <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
             {/* Preview Toggle */}
             <div className="flex items-center gap-2 mb-4">
               <button
@@ -1098,41 +1098,43 @@ const Editor = () => {
               </button>
             </div>
 
-            {useRemotionPreview ? (
-              <RemotionPreview
-                scenes={scenes}
-                currentSceneIndex={currentSceneIndex}
-                isPlaying={isPlaying}
-                onTogglePlay={togglePlayback}
-                onTimeUpdate={(time) => seek(time / 1000)}
-                onSceneChange={(idx) => {
-                  setSelectedScene(scenes[idx]?.id || null);
-                  seekToScene(idx);
-                }}
-                fallbackAsset={assets[0]}
-                musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
-                musicVolume={musicVolume}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted(!isMuted)}
-                brandColor={project?.brand_color || "#8B5CF6"}
-                logoUrl={project?.logo_url || undefined}
-              />
-            ) : (
-              <PreviewPlayer
-                scenes={scenes}
-                currentSceneIndex={currentSceneIndex}
-                currentSceneProgress={currentSceneProgress}
-                isPlaying={isPlaying}
-                onTogglePlay={togglePlayback}
-                fallbackAsset={assets[0]}
-                musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
-                musicVolume={musicVolume}
-                isMuted={isMuted}
-                onToggleMute={() => setIsMuted(!isMuted)}
-                currentTime={currentTime}
-                totalDuration={totalDuration}
-              />
-            )}
+            <div className="w-full max-w-4xl">
+              {useRemotionPreview ? (
+                <RemotionPreview
+                  scenes={scenes}
+                  currentSceneIndex={currentSceneIndex}
+                  isPlaying={isPlaying}
+                  onTogglePlay={togglePlayback}
+                  onTimeUpdate={(time) => seek(time / 1000)}
+                  onSceneChange={(idx) => {
+                    setSelectedScene(scenes[idx]?.id || null);
+                    seekToScene(idx);
+                  }}
+                  fallbackAsset={assets[0]}
+                  musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
+                  musicVolume={musicVolume}
+                  isMuted={isMuted}
+                  onToggleMute={() => setIsMuted(!isMuted)}
+                  brandColor={project?.brand_color || "#8B5CF6"}
+                  logoUrl={project?.logo_url || undefined}
+                />
+              ) : (
+                <PreviewPlayer
+                  scenes={scenes}
+                  currentSceneIndex={currentSceneIndex}
+                  currentSceneProgress={currentSceneProgress}
+                  isPlaying={isPlaying}
+                  onTogglePlay={togglePlayback}
+                  fallbackAsset={assets[0]}
+                  musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
+                  musicVolume={musicVolume}
+                  isMuted={isMuted}
+                  onToggleMute={() => setIsMuted(!isMuted)}
+                  currentTime={currentTime}
+                  totalDuration={totalDuration}
+                />
+              )}
+            </div>
           </div>
 
           {/* Timeline */}
