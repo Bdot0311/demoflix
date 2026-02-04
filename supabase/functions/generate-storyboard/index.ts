@@ -280,8 +280,8 @@ FOR EACH SCENE, provide:
 1. headline: 2-5 word power statement (ALL CAPS style energy)
 2. subtext: 6-12 word supporting line (optional, can be empty for pure visual impact)
 3. scene_type: "hook", "tension", "reveal", "feature", "benefit", "climax", or "cta"
-4. zoom_level: 1.0-1.4 (subtle zoom for Ken Burns effect)
-5. pan_direction: "left", "right", "up", "down", or "center"
+4. zoom_level: VARY between 1.0-2.0 (dramatic zooms for visual impact!)
+5. pan_direction: VARY between "left", "right", "up", "down", "center" for dynamic camera movement
 
 Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
 

@@ -82,7 +82,7 @@ const NewDemo = () => {
         // For single asset trailers, all scenes use the same asset
         const isSingleAsset = data.isSingleAsset || files.length === 1;
 
-        // Create scenes with AI-generated Netflix-style content
+        // Create scenes with AI-generated Netflix-style content including full motion config
         const scenesToInsert = data.scenes.map((scene: any, index: number) => ({
           project_id: projectId,
           // For single asset, all scenes use the first asset
@@ -91,10 +91,12 @@ const NewDemo = () => {
           headline: scene.headline || `Scene ${index + 1}`,
           subtext: scene.subtext || "",
           duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / data.scenes.length),
-          transition: scene.scene_type === "hook" ? "fade" : "slideLeft",
+          transition: scene.transition || (scene.scene_type === "hook" ? "fade" : "slide-left"),
           zoom_level: scene.zoom_level || 1.2,
-          pan_x: scene.pan_direction === "left" ? -0.1 : scene.pan_direction === "right" ? 0.1 : 0,
-          pan_y: scene.pan_direction === "up" ? -0.1 : scene.pan_direction === "down" ? 0.1 : 0,
+          pan_x: scene.pan_direction === "left" ? -5 : scene.pan_direction === "right" ? 5 : 0,
+          pan_y: scene.pan_direction === "up" ? -3 : scene.pan_direction === "down" ? 3 : 0,
+          // Store the full motion config from AI generation
+          motion_config: scene.motion_config || null,
         }));
 
         await supabase.from("scenes").insert(scenesToInsert);

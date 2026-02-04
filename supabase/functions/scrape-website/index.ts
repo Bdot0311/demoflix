@@ -103,7 +103,18 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ['screenshot', 'links', 'markdown', 'branding'],
+        formats: ['screenshot', 'links', 'markdown'],
+        extract: {
+          schema: {
+            type: 'object',
+            properties: {
+              logo: { type: 'string', description: 'URL of the company logo' },
+              images: { type: 'array', items: { type: 'string' }, description: 'URLs of important images on the page' },
+              primaryColor: { type: 'string', description: 'Primary brand color in hex format' },
+              secondaryColor: { type: 'string', description: 'Secondary brand color in hex format' },
+            }
+          }
+        },
         waitFor: 3000,
       }),
     });
@@ -120,12 +131,29 @@ Deno.serve(async (req) => {
 
     const mainData = mainPageData.data || mainPageData;
     result.screenshot = mainData.screenshot;
-    result.branding = mainData.branding;
+    
+    // Extract branding from extract results or existing branding data
+    const extractedData = mainData.extract || {};
+    result.branding = {
+      logo: extractedData.logo || mainData.branding?.logo,
+      colors: {
+        primary: extractedData.primaryColor || mainData.branding?.colors?.primary,
+        secondary: extractedData.secondaryColor || mainData.branding?.colors?.secondary,
+        background: mainData.branding?.colors?.background,
+      },
+      fonts: mainData.branding?.fonts,
+    };
+    
     result.metadata = {
       title: mainData.metadata?.title || formattedUrl,
       description: mainData.metadata?.description,
       sourceURL: formattedUrl,
     };
+    
+    // Add extracted images to our images array
+    if (extractedData.images && Array.isArray(extractedData.images)) {
+      result.images!.push(...extractedData.images);
+    }
 
     // Add main page to pages list
     result.pages!.push({

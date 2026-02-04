@@ -244,6 +244,7 @@ export type Database = {
           duration_ms: number
           headline: string | null
           id: string
+          motion_config: Json | null
           order_index: number
           pan_x: number | null
           pan_y: number | null
@@ -259,6 +260,7 @@ export type Database = {
           duration_ms?: number
           headline?: string | null
           id?: string
+          motion_config?: Json | null
           order_index?: number
           pan_x?: number | null
           pan_y?: number | null
@@ -274,6 +276,7 @@ export type Database = {
           duration_ms?: number
           headline?: string | null
           id?: string
+          motion_config?: Json | null
           order_index?: number
           pan_x?: number | null
           pan_y?: number | null
