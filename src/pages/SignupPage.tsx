@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock, User, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import demoflixEmblem from "@/assets/demoflix-emblem.png";
@@ -73,8 +73,17 @@ const SignupPage = () => {
       {/* Right side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
+          {/* Back Button */}
+          <Link 
+            to="/" 
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to home</span>
+          </Link>
+
           {/* Logo and Theme Toggle */}
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex items-center justify-between mb-8">
             <Link to="/" className="flex items-center gap-2">
               <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
               <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
