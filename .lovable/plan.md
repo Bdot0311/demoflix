@@ -1,130 +1,87 @@
-# DemoFlix: Migrate to Remotion + Claude for Motion-Style Demos
 
-## Status: Phases 1-5 Complete ✅
+# Fix Video Preview Layout Issue
 
-### Completed ✅
+## Problem Analysis
 
-**Phase 1: Remotion Project Setup**
-- Added `remotion`, `@remotion/player`, and `zod` dependencies
-- Created `src/remotion/` directory with full composition structure
-- Built `Root.tsx` with 4 compositions (horizontal, vertical, square, with intro)
-- Created `DemoTrailer.tsx` composition with scene sequencing
-  
-**Phase 2: Port Effects to Remotion**
-- `KineticText.tsx` - 5 animation styles: bounce-in, typewriter, slide-mask, fade-scale, word-stagger
-- `MotionOverlays.tsx` - Particles, Vignette, Glow, ScanLines, GradientOverlay, AccentLine, ProgressRing, FilmGrain
-- `Transitions.tsx` - Fade, Slide, Zoom, Wipe, CrossDissolve
-- `Scene.tsx` - Complete scene component with Ken Burns and effects
-- `animations.ts` - Spring presets, Zod schemas, easing functions
+The Remotion preview player is expanding to fill all available horizontal space without any constraint, pushing the sidebars out of view. This happens because:
 
-**Phase 3: Claude Motion Direction**
-- Enhanced `generate-storyboard` edge function with full motion config
-- Each scene now includes: animation_style, spring physics, effects, transitions
-- Motion config auto-selected based on scene_type (hook, tension, reveal, feature, benefit, climax, cta)
-- Deployed updated edge function
+1. **RemotionPreview.tsx** uses `w-full aspect-video` which takes 100% width of its parent
+2. **Editor.tsx** center area uses `flex-1` without `min-w-0` or `overflow-hidden`, allowing flex items to grow beyond their container
+3. No `max-width` constraint is applied to the preview container
 
-**Phase 4: Remotion Lambda Integration**
-- Created `render-remotion` edge function - triggers Lambda or falls back to Shotstack
-- Created `remotion-webhook` edge function - handles completion callbacks
-- Created `check-remotion-status` edge function - polls render progress
-- Supports dev mode with simulated progress when AWS not configured
+## Solution
 
-**Phase 5: Unified Preview & Render**
-- Created `RemotionPreview.tsx` wrapper component with full playback controls
-- Integrated RemotionPreview into Editor with toggle switch
-- Updated RenderPage to use Remotion renderer (with Shotstack fallback)
-- WYSIWYG: Preview now matches rendered output
+Apply CSS constraints to both the center container and the preview component:
 
----
+### File: `src/pages/Editor.tsx`
 
-## AWS Setup Required
+**Change 1 - Line 1072:** Add `min-w-0` and `overflow-hidden` to the main preview container:
+```tsx
+// Before:
+<div className="flex-1 flex flex-col">
 
-To enable production video rendering, you need to provide these secrets:
-
-| Secret | Purpose |
-|--------|---------|
-| `AWS_ACCESS_KEY_ID` | AWS IAM access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS IAM secret key |
-| `REMOTION_AWS_REGION` | Lambda region (default: us-east-1) |
-| `REMOTION_FUNCTION_NAME` | Your deployed Lambda function name |
-| `REMOTION_SERVE_URL` | S3 URL where Remotion bundle is hosted |
-
-Without these, the system falls back to Shotstack or development simulation mode.
-
----
-
-## File Structure
-
-```
-src/remotion/
-├── Root.tsx                         ✅ Remotion entry point
-├── compositions/
-│   └── DemoTrailer.tsx              ✅ Main trailer composition
-├── components/
-│   ├── Scene.tsx                    ✅ Individual scene renderer
-│   ├── KineticText.tsx              ✅ Text animations (5 styles)
-│   ├── MotionOverlays.tsx           ✅ Visual effects (8 types)
-│   └── Transitions.tsx              ✅ Scene transitions (5 types)
-└── lib/
-    └── animations.ts                ✅ Spring configs, types, helpers
-
-src/components/editor/
-├── PreviewPlayer.tsx                ✅ Legacy CSS preview (kept as fallback)
-└── RemotionPreview.tsx              ✅ New Remotion-based preview
-
-src/pages/
-├── Editor.tsx                       ✅ Toggle between CSS and Remotion preview
-└── RenderPage.tsx                   ✅ Uses Remotion renderer
-
-supabase/functions/
-├── generate-storyboard/             ✅ Enhanced with motion config
-├── render-remotion/                 ✅ Remotion Lambda trigger
-├── check-remotion-status/           ✅ Polls Remotion progress
-├── remotion-webhook/                ✅ Handles Lambda callbacks
-├── render-video/                    (Legacy - Shotstack fallback)
-└── check-render-status/             (Legacy - Shotstack fallback)
+// After:
+<div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 ```
 
----
+**Change 2 - Line 1074:** Add `overflow-hidden` and constrain the preview wrapper:
+```tsx
+// Before:
+<div className="flex-1 flex flex-col items-center justify-center p-8">
 
-## Technical Notes
-
-### Motion Config Schema (from Claude-enhanced storyboard)
-
-```typescript
-interface MotionConfig {
-  animation_style: "bounce-in" | "typewriter" | "slide-mask" | "fade-scale" | "word-stagger";
-  spring: {
-    damping: number;
-    mass: number;
-    stiffness: number;
-    overshootClamping: boolean;
-  };
-  stagger_delay_frames: number;
-  entrance_delay_frames: number;
-  effects: ("particles" | "vignette" | "glow" | "scanlines")[];
-}
+// After:
+<div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
 ```
 
-### Scene Type → Motion Mapping
+**Change 3 - Around lines 1101-1119:** Wrap the RemotionPreview in a constrained container:
+```tsx
+// Before:
+{useRemotionPreview ? (
+  <RemotionPreview ... />
+) : ( ... )}
 
-| Scene Type | Animation Style | Effects | Transition |
-|------------|-----------------|---------|------------|
-| hook | bounce-in | vignette, glow, particles | zoom |
-| tension | slide-mask | vignette, scanlines | slide-left |
-| reveal | word-stagger | glow, particles | fade |
-| feature | fade-scale | vignette, glow | slide-right |
-| benefit | bounce-in | particles, vignette | slide-left |
-| climax | word-stagger | all effects | zoom |
-| cta | fade-scale | glow, vignette | fade |
-
-### Renderer Fallback Logic
-
+// After:
+<div className="w-full max-w-4xl">
+  {useRemotionPreview ? (
+    <RemotionPreview ... />
+  ) : ( ... )}
+</div>
 ```
-render-remotion called
-├── AWS configured? → Trigger Remotion Lambda
-│   └── Status via check-remotion-status
-│   └── Completion via remotion-webhook
-└── AWS not configured? → Fall back to render-video (Shotstack)
-    └── Status via check-render-status
+
+### File: `src/components/editor/RemotionPreview.tsx`
+
+**Change - Line 300:** Ensure the container doesn't overflow:
+```tsx
+// Before:
+className={cn(
+  "relative w-full bg-black rounded-lg overflow-hidden group",
+  isFullscreen ? "fixed inset-0 z-50" : "aspect-video"
+)}
+
+// After:
+className={cn(
+  "relative w-full max-w-full bg-black rounded-lg overflow-hidden group",
+  isFullscreen ? "fixed inset-0 z-50" : "aspect-video"
+)}
 ```
+
+## Technical Details
+
+| Property | Purpose |
+|----------|---------|
+| `min-w-0` | Allows flex items to shrink below their content size (prevents overflow in flex containers) |
+| `overflow-hidden` | Clips content that exceeds container bounds |
+| `max-w-4xl` (896px) | Constrains preview to a reasonable size that fits between sidebars |
+
+## Result
+
+The preview will:
+- Stay within the center column bounds
+- Maintain 16:9 aspect ratio
+- Not push sidebars off-screen
+- Still support fullscreen mode (which uses `fixed inset-0`)
+
+## Files to Modify
+
+1. `src/pages/Editor.tsx` - Add flex constraints and wrapper div
+2. `src/components/editor/RemotionPreview.tsx` - Add `max-w-full` safety
