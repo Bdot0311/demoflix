@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.check-render-status]
 verify_jwt = false
+
+[functions.render-remotion]
+verify_jwt = false
+
+[functions.remotion-webhook]
+verify_jwt = false
+
+[functions.check-remotion-status]
+verify_jwt = false

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import {
   DndContext,
@@ -60,6 +61,7 @@ import { usePlayback } from "@/hooks/usePlayback";
 import { useHistory } from "@/hooks/useHistory";
 import { SortableScene } from "@/components/editor/SortableScene";
 import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
+import { RemotionPreview } from "@/components/editor/RemotionPreview";
 import { TimelineTrack } from "@/components/editor/TimelineTrack";
 import { MusicSelector } from "@/components/editor/MusicSelector";
 import { BrandingPanel } from "@/components/editor/BrandingPanel";
@@ -146,6 +148,7 @@ const Editor = () => {
   const [isRecommendingMusic, setIsRecommendingMusic] = useState(false);
   const [musicRecommendations, setMusicRecommendations] = useState<MusicRecommendation[]>([]);
   const [storyboardMood, setStoryboardMood] = useState<string | null>(null);
+  const [useRemotionPreview, setUseRemotionPreview] = useState(true);
 
   // History for undo/redo
   const {
@@ -1068,21 +1071,68 @@ const Editor = () => {
         {/* Main Preview Area */}
         <div className="flex-1 flex flex-col">
           {/* Preview */}
-          <div className="flex-1 flex items-center justify-center p-8">
-            <PreviewPlayer
-              scenes={scenes}
-              currentSceneIndex={currentSceneIndex}
-              currentSceneProgress={currentSceneProgress}
-              isPlaying={isPlaying}
-              onTogglePlay={togglePlayback}
-              fallbackAsset={assets[0]}
-              musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
-              musicVolume={musicVolume}
-              isMuted={isMuted}
-              onToggleMute={() => setIsMuted(!isMuted)}
-              currentTime={currentTime}
-              totalDuration={totalDuration}
-            />
+          <div className="flex-1 flex flex-col items-center justify-center p-8">
+            {/* Preview Toggle */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setUseRemotionPreview(false)}
+                className={cn(
+                  "px-3 py-1.5 text-xs rounded-l-md border transition-colors",
+                  !useRemotionPreview 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                )}
+              >
+                CSS Preview
+              </button>
+              <button
+                onClick={() => setUseRemotionPreview(true)}
+                className={cn(
+                  "px-3 py-1.5 text-xs rounded-r-md border transition-colors",
+                  useRemotionPreview 
+                    ? "bg-primary text-primary-foreground border-primary" 
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                )}
+              >
+                Remotion Preview
+              </button>
+            </div>
+
+            {useRemotionPreview ? (
+              <RemotionPreview
+                scenes={scenes}
+                currentSceneIndex={currentSceneIndex}
+                isPlaying={isPlaying}
+                onTogglePlay={togglePlayback}
+                onTimeUpdate={(time) => seek(time / 1000)}
+                onSceneChange={(idx) => {
+                  setSelectedScene(scenes[idx]?.id || null);
+                  seekToScene(idx);
+                }}
+                fallbackAsset={assets[0]}
+                musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
+                musicVolume={musicVolume}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(!isMuted)}
+                brandColor={project?.brand_color || "#8B5CF6"}
+                logoUrl={project?.logo_url || undefined}
+              />
+            ) : (
+              <PreviewPlayer
+                scenes={scenes}
+                currentSceneIndex={currentSceneIndex}
+                currentSceneProgress={currentSceneProgress}
+                isPlaying={isPlaying}
+                onTogglePlay={togglePlayback}
+                fallbackAsset={assets[0]}
+                musicUrl={musicTracks.find(t => t.id === selectedTrack)?.file_url}
+                musicVolume={musicVolume}
+                isMuted={isMuted}
+                onToggleMute={() => setIsMuted(!isMuted)}
+                currentTime={currentTime}
+                totalDuration={totalDuration}
+              />
+            )}
           </div>
 
           {/* Timeline */}
