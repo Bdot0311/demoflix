@@ -5,6 +5,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface MotionConfig {
+  animation_style: "bounce-in" | "typewriter" | "slide-mask" | "fade-scale" | "word-stagger";
+  spring: {
+    damping: number;
+    mass: number;
+    stiffness: number;
+    overshootClamping: boolean;
+  };
+  stagger_delay_frames: number;
+  entrance_delay_frames: number;
+  effects: ("particles" | "vignette" | "glow" | "scanlines")[];
+}
+
 interface SceneData {
   order_index: number;
   headline: string;
@@ -13,7 +26,115 @@ interface SceneData {
   scene_type: string;
   zoom_level: number;
   pan_direction: string;
+  transition: string;
+  motion_config: MotionConfig;
 }
+
+// Spring presets for different animation feels
+const springPresets = {
+  bouncy: { damping: 12, mass: 1, stiffness: 100, overshootClamping: false },
+  snappy: { damping: 20, mass: 0.5, stiffness: 200, overshootClamping: false },
+  smooth: { damping: 30, mass: 1, stiffness: 80, overshootClamping: true },
+  gentle: { damping: 25, mass: 1.5, stiffness: 60, overshootClamping: false },
+  elastic: { damping: 8, mass: 0.8, stiffness: 150, overshootClamping: false },
+};
+
+// Map scene type to recommended animation style and effects
+const getMotionConfigForSceneType = (sceneType: string, sceneIndex: number, totalScenes: number): MotionConfig => {
+  const isFirst = sceneIndex === 0;
+  const isLast = sceneIndex === totalScenes - 1;
+  
+  switch (sceneType) {
+    case "hook":
+      return {
+        animation_style: "bounce-in",
+        spring: springPresets.elastic,
+        stagger_delay_frames: 2,
+        entrance_delay_frames: 5,
+        effects: ["vignette", "glow", "particles"],
+      };
+    case "tension":
+      return {
+        animation_style: "slide-mask",
+        spring: springPresets.snappy,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 8,
+        effects: ["vignette", "scanlines"],
+      };
+    case "reveal":
+      return {
+        animation_style: "word-stagger",
+        spring: springPresets.bouncy,
+        stagger_delay_frames: 3,
+        entrance_delay_frames: 10,
+        effects: ["glow", "particles"],
+      };
+    case "feature":
+      return {
+        animation_style: "fade-scale",
+        spring: springPresets.smooth,
+        stagger_delay_frames: 2,
+        entrance_delay_frames: 12,
+        effects: ["vignette", "glow"],
+      };
+    case "benefit":
+      return {
+        animation_style: "bounce-in",
+        spring: springPresets.gentle,
+        stagger_delay_frames: 2,
+        entrance_delay_frames: 8,
+        effects: ["particles", "vignette"],
+      };
+    case "climax":
+      return {
+        animation_style: "word-stagger",
+        spring: springPresets.elastic,
+        stagger_delay_frames: 2,
+        entrance_delay_frames: 5,
+        effects: ["vignette", "glow", "particles", "scanlines"],
+      };
+    case "cta":
+      return {
+        animation_style: "fade-scale",
+        spring: springPresets.bouncy,
+        stagger_delay_frames: 3,
+        entrance_delay_frames: 10,
+        effects: ["glow", "vignette"],
+      };
+    default:
+      return {
+        animation_style: "bounce-in",
+        spring: springPresets.bouncy,
+        stagger_delay_frames: 2,
+        entrance_delay_frames: 10,
+        effects: ["vignette", "glow"],
+      };
+  }
+};
+
+// Map scene type to transition
+const getTransitionForSceneType = (sceneType: string, sceneIndex: number): string => {
+  if (sceneIndex === 0) return "fade"; // First scene always fades in
+  
+  switch (sceneType) {
+    case "hook":
+      return "zoom";
+    case "tension":
+      return "slide-left";
+    case "reveal":
+      return "fade";
+    case "feature":
+      return "slide-right";
+    case "benefit":
+      return "slide-left";
+    case "climax":
+      return "zoom";
+    case "cta":
+      return "fade";
+    default:
+      return "fade";
+  }
+};
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,32 +150,33 @@ serve(async (req) => {
     }
 
     // For single assets, we generate multiple scenes (5-7 based on duration)
-    // This creates a dynamic trailer from one screenshot with different headlines and effects
     const isSingleAsset = assetCount === 1;
     const targetSceneCount = isSingleAsset 
-      ? Math.max(5, Math.min(7, Math.floor(duration / 5))) // 5-7 scenes for single asset trailers
+      ? Math.max(5, Math.min(7, Math.floor(duration / 5)))
       : assetCount;
 
-    // Calculate scene duration with room for transitions
     const sceneDuration = Math.floor((duration * 1000) / targetSceneCount);
 
-    // Netflix-style trailer system prompt
-    const systemPrompt = `You are a world-class film trailer editor who creates viral Netflix-style product trailers. Your trailers are:
+    // Enhanced system prompt for Claude to generate motion-aware storyboards
+    const systemPrompt = `You are a world-class motion graphics director who creates viral Netflix-style product trailers with Framer-quality animations. Your trailers are:
 
 - DRAMATIC: Every word hits like a punch. Short. Powerful. Unforgettable.
 - CINEMATIC: Think movie trailer, not corporate video. Build tension, then release.
 - EMOTIONAL: Connect with viewers' desires, fears, and aspirations.
 - RHYTHMIC: Perfect pacing that keeps viewers glued to the screen.
+- MOTION-AWARE: You think in terms of animations, timing, and visual flow.
 
 Your signature style:
 - Headlines are 2-5 words MAX. No fluff. Pure impact.
 - Use power words: Revolutionary, Unleash, Dominate, Transform, Unstoppable
 - Create a narrative arc: Hook → Build tension → Reveal → Call to action
 - Each scene should make viewers FEEL something
+- You consider how text will animate in (bounce, slide, typewriter, stagger)
+- You think about camera movement (Ken Burns zoom/pan for drama)
 ${isSingleAsset ? `
 IMPORTANT: You are creating a multi-scene trailer from a SINGLE screenshot. 
 Each scene will show the same image with DIFFERENT:
-- Headlines and text overlays
+- Headlines and text overlays with varied animation styles
 - Zoom levels and pan directions (Ken Burns effect)
 - This creates a dynamic, cinematic feel from one static image` : ''}`;
 
@@ -112,7 +234,6 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
     // Add images to analyze (limit to 10)
     if (imageUrls && imageUrls.length > 0) {
       for (const url of imageUrls.slice(0, 10)) {
-        // Only add image URLs that look like valid image formats
         if (url.match(/\.(jpg|jpeg|png|gif|webp)/i)) {
           content.push({
             type: "image_url",
@@ -163,7 +284,7 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
     console.log("AI Response:", content_text);
 
     // Extract JSON from the response
-    let scenes: SceneData[] = [];
+    let scenes: any[] = [];
     try {
       const jsonMatch = content_text.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
@@ -176,7 +297,7 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
     // Validate and ensure we have the right number of scenes
     if (!scenes || scenes.length !== targetSceneCount) {
       console.log("Generating fallback Netflix-style scenes for", targetSceneCount, "scenes");
-      // Generate compelling fallback scenes
+      
       const fallbackHeadlines = [
         { headline: "THE FUTURE IS HERE", subtext: "", type: "hook", zoom: 1.3, pan: "center" },
         { headline: "POWER UNLEASHED", subtext: "Built for those who demand more", type: "feature", zoom: 1.2, pan: "right" },
@@ -189,7 +310,6 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
 
       scenes = Array.from({ length: targetSceneCount }, (_, i) => {
         const fallback = fallbackHeadlines[i % fallbackHeadlines.length];
-        // First scene is always hook, last is always CTA
         if (i === 0) {
           return {
             order_index: i,
@@ -224,18 +344,28 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
       });
     }
 
-    // Return targetSceneCount and isSingleAsset flag for frontend to handle asset linking
+    // Enhance scenes with motion config and transitions
+    const enhancedScenes: SceneData[] = scenes.map((scene, i) => {
+      const sceneType = scene.scene_type || "feature";
+      const motionConfig = getMotionConfigForSceneType(sceneType, i, targetSceneCount);
+      const transition = getTransitionForSceneType(sceneType, i);
+
+      return {
+        order_index: scene.order_index ?? i,
+        headline: scene.headline || "POWER",
+        subtext: scene.subtext || "",
+        duration_ms: scene.duration_ms || sceneDuration,
+        scene_type: sceneType,
+        zoom_level: scene.zoom_level || 1.2,
+        pan_direction: scene.pan_direction || "center",
+        transition,
+        motion_config: motionConfig,
+      };
+    });
+
     return new Response(
       JSON.stringify({ 
-        scenes: scenes.map((scene, i) => ({
-          order_index: scene.order_index ?? i,
-          headline: scene.headline || "POWER",
-          subtext: scene.subtext || "",
-          duration_ms: scene.duration_ms || sceneDuration,
-          scene_type: scene.scene_type || "feature",
-          zoom_level: scene.zoom_level || 1.2,
-          pan_direction: scene.pan_direction || "center",
-        })),
+        scenes: enhancedScenes,
         isSingleAsset,
         targetSceneCount
       }),
