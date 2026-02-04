@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: formattedUrl,
-        formats: ['screenshot', 'links', 'markdown'],
+        formats: ['screenshot', 'links', 'markdown', 'extract'],
         extract: {
           schema: {
             type: 'object',
