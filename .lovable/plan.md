@@ -1,220 +1,304 @@
 
 
-# DemoFlix - Cinematic SaaS Demo Trailer Generator
+# DemoFlix: Migrate to Remotion + Claude for Motion-Style Demos
 
-## 🎯 Vision
-Transform boring SaaS screenshots and screen recordings into Netflix-style product trailers with no editing skills required.
+## Overview
 
----
+This plan replaces the current Shotstack-based video generation with **Remotion** (React-based programmatic video) + **Claude** (Lovable AI) to create true Framer-style motion graphics demos. This combination enables:
 
-## 🎨 Design Direction
-**Dark cinematic theme** with:
-- Deep dark backgrounds with subtle gradients
-- Neon accent glows (purple, cyan, red)
-- Netflix-inspired typography and animations
-- Dramatic hover effects and transitions
-- Futuristic UI elements
+- **Real React components** rendered as video (same quality as web preview)
+- **Claude-powered** motion design decisions (animations, timing, effects)
+- **Full control** over every animation, transition, and effect
+- **Serverless rendering** via Remotion Lambda (AWS)
 
 ---
 
-## 📱 Pages & Features
+## Current Architecture vs New Architecture
 
-### 1. Landing Page
-- Hero section with dramatic video preview/animation
-- "Create Your Trailer" CTA button
-- Feature highlights with cinematic icons
-- Style showcase gallery (Netflix, Apple, Startup, etc.)
-- Social proof section
-- Footer with links
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                     CURRENT (Shotstack)                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  Editor Preview    →    Shotstack API    →    MP4 Output           │
+│  (React/CSS)             (JSON Timeline)       (Different look)     │
+│                                                                     │
+│  Problem: Preview ≠ Final output. Limited animations.              │
+└─────────────────────────────────────────────────────────────────────┘
 
-### 2. Authentication
-- Login/Signup with email and password
-- Dark themed auth forms with glowing accents
-- Smooth transitions between login/signup
+                              ↓ MIGRATION ↓
 
-### 3. Dashboard
-- Projects grid with thumbnail previews
-- "New Demo" creation button
-- Project cards showing: thumbnail, name, date, status
-- Quick actions: edit, duplicate, delete
-- Empty state for new users
-
-### 4. New Demo Generator (Multi-step wizard)
-**Step 1 - Upload Assets**
-- Drag & drop zone for images and videos
-- Support for PNG, JPG, MP4, MOV
-- Upload progress indicators
-- Preview uploaded files in a grid
-
-**Step 2 - Choose Style**
-- 6 trailer style cards:
-  - Netflix Series Intro
-  - Startup Launch Trailer
-  - AI / Futuristic
-  - Clean Apple-style
-  - Dark SaaS / Cyber
-  - Bold Growth / Sales-Driven
-- Visual preview of each style
-
-**Step 3 - Select Duration**
-- Duration options: 15s, 30s, 45s, 60s
-- Preview what fits in each duration
-
-**Step 4 - AI Storyboard Generation**
-- AI analyzes uploaded visuals
-- Generates trailer structure:
-  - Hook (problem/bold statement)
-  - Feature reveals
-  - Benefits
-  - Momentum build
-  - Closing CTA
-- Auto-generated text headlines
-- Scene order preview
-
-### 5. Trailer Editor
-- Timeline view at bottom
-- Scene cards that can be reordered (drag & drop)
-- Per-scene controls:
-  - Edit text overlays
-  - Adjust timing
-  - Zoom/pan settings
-- Music selector panel:
-  - Pre-loaded royalty-free tracks
-  - Categories: Cinematic, Tech, Hype, Ambient
-  - Preview playback
-  - Mute option
-- Brand customization:
-  - Primary/accent color picker
-  - Logo upload
-- Live preview window
-
-### 6. Render/Processing Screen
-- Cinematic loading animation
-- Progress bar with percentage
-- Queue position indicator
-- Estimated time remaining
-- "Your trailer is being crafted..." messaging
-
-### 7. Final Preview & Download
-- Full video player with controls
-- Download buttons:
-  - Horizontal (16:9)
-  - Vertical (9:16)
-  - Square (1:1)
-- Shareable link with copy button
-- "Create Another" button
-- Save to project history
+┌─────────────────────────────────────────────────────────────────────┐
+│                     NEW (Remotion + Claude)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  Remotion Composition  →  Remotion Lambda  →  MP4 Output           │
+│  (React/Motion)             (AWS Render)       (WYSIWYG)            │
+│                                                                     │
+│  + Claude AI → Motion direction, animation params, timing          │
+│  Benefit: Preview === Final output. Unlimited animations.          │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 🧠 AI Features (Lovable AI)
+## Implementation Phases
 
-1. **Visual Analysis**
-   - Identify UI sections, dashboards, charts, flows
-   - Auto-detect key screens to highlight
-   - Suggest scene ordering
+### Phase 1: Remotion Project Setup
 
-2. **Storyboard Generation**
-   - Create structured trailer flow
-   - Generate punchy headlines and CTAs
-   - Match text tone to selected style
+**Create Remotion video composition package:**
 
-3. **Text Generation**
-   - Auto-generate: hooks, feature callouts, CTAs
-   - Examples: "Built for scale.", "Your workflow. Supercharged."
+1. **New directory**: `remotion/` at project root containing:
+   - `src/Root.tsx` - Remotion root component
+   - `src/compositions/DemoTrailer.tsx` - Main trailer composition
+   - `src/components/Scene.tsx` - Individual scene component
+   - `src/components/KineticText.tsx` - Port existing kinetic typography
+   - `src/components/MotionOverlays.tsx` - Particles, vignette, glow
+   - `src/styles/` - Shared styles
+   - `remotion.config.ts` - Remotion configuration
+
+2. **Key compositions to create:**
+   - `DemoTrailer` - Main composition accepting scene data as props
+   - Scene-level components with spring animations
+   - Text reveal effects using `spring()` and `interpolate()`
+   - Ken Burns zoom/pan using frame-based transforms
+
+### Phase 2: Port Preview Effects to Remotion
+
+**Migrate existing Framer-style effects:**
+
+| Current (PreviewPlayer.tsx) | Remotion Equivalent |
+|----------------------------|---------------------|
+| `KineticText` CSS animation | `spring()` + `interpolate()` per-character |
+| `FloatingParticles` CSS keyframes | Frame-based position + `random()` seeds |
+| `VignetteEffect` static | Radial gradient with optional animation |
+| `ScanLineEffect` overlay | Same approach, frame-synced |
+| Ken Burns `scale`/`translate` | `interpolate(frame, ...)` transforms |
+| Transitions (fade, slide, etc.) | `Sequence` + `interpolate` opacity/position |
+
+**New motion capabilities:**
+
+- **Spring physics**: Natural bouncy animations with configurable damping
+- **Staggered reveals**: Word/character reveals with precise timing
+- **3D transforms**: Depth effects and perspective rotations
+- **Morphing shapes**: SVG path animations for callouts/highlights
+- **Synchronized audio**: Frame-perfect music sync
+
+### Phase 3: Claude-Powered Motion Direction
+
+**Enhance the generate-storyboard edge function:**
+
+Replace the current headline-only generation with full motion direction:
+
+```text
+Claude receives:
+  - Uploaded images (visual context)
+  - Selected style (Netflix, Apple, etc.)
+  - Duration constraints
+
+Claude returns:
+  - Scene headlines/subtext (existing)
+  - Animation style per scene ("bounce-in", "typewriter", "mask-reveal")
+  - Spring config (damping, mass, stiffness)
+  - Transition type and timing
+  - Overlay effects to enable
+  - Camera motion direction (Ken Burns params)
+  - Music sync cues ("beat-sync", "fade-in")
+```
+
+**New `generate-motion-config` edge function:**
+
+This function calls Claude (via Lovable AI) to generate detailed motion parameters for each scene, producing a JSON schema that Remotion consumes directly.
+
+### Phase 4: Remotion Lambda Integration
+
+**Backend rendering architecture:**
+
+1. **New edge function**: `render-remotion/index.ts`
+   - Receives: `projectId`, `renderId`, scene data
+   - Calls: `renderMediaOnLambda()` via Remotion Lambda client
+   - Outputs: Video to Supabase Storage
+
+2. **AWS Setup required** (user must configure):
+   - AWS credentials (access key + secret)
+   - Remotion Lambda function deployed
+   - S3 bucket for render outputs
+   - Webhook endpoint for completion notifications
+
+3. **New edge function**: `remotion-webhook/index.ts`
+   - Receives completion callbacks from Remotion Lambda
+   - Updates `renders` table with video URLs
+   - Notifies frontend via realtime subscription
+
+### Phase 5: Unified Preview & Render
+
+**Make preview use Remotion Player:**
+
+Replace `PreviewPlayer.tsx` with `@remotion/player` component:
+
+```text
+Benefits:
+  - WYSIWYG: What you see = what you render
+  - Scrubbing, frame-accurate preview
+  - Same React components for preview + render
+  - Hot-reload during editing
+```
+
+**Frontend changes:**
+
+1. **Editor.tsx** → Import `Player` from `@remotion/player`
+2. **PreviewPlayer.tsx** → Replaced by Remotion Player wrapper
+3. **RenderPage.tsx** → Call `render-remotion` instead of `render-video`
+4. **PreviewPage.tsx** → Show rendered videos (unchanged)
 
 ---
 
-## 🎥 Video Generation
+## Database Changes
 
-**Architecture preparation for video API integration:**
-- Modular video service layer (ready for Creatomate, Shotstack, or similar)
-- Template system for each trailer style
-- Asset management for uploaded files
-- Render job queue system
-- Progress tracking via webhooks
+No schema changes required. The existing `scenes` table structure supports the new workflow:
+- `zoom_level`, `pan_x`, `pan_y` → Ken Burns config
+- `transition` → Transition type
+- `duration_ms` → Scene timing
 
----
-
-## 🎵 Audio System
-
-- Pre-loaded royalty-free music library
-- Categorized by mood (Cinematic, Tech, Hype, Ambient)
-- Music metadata storage
-- Preview playback in editor
-- Mute/no music option
+**Optional enhancement**: Add columns for advanced motion config:
+- `animation_style` (text) - e.g., "bounce-in", "typewriter"
+- `spring_config` (jsonb) - damping, mass, stiffness
+- `effects_enabled` (text[]) - particles, vignette, etc.
 
 ---
 
-## 🔐 Backend & Infrastructure
+## Edge Functions
 
-**Authentication:**
-- User accounts with email/password
-- Session management
-
-**Database (Supabase):**
-- Users table
-- Projects table (user's demo projects)
-- Assets table (uploaded files per project)
-- Renders table (completed videos)
-- Music library table
-
-**Storage:**
-- Secure file uploads to Supabase Storage
-- Cloud storage for rendered videos
-- CDN delivery for final outputs
-
-**Processing:**
-- Edge functions for AI analysis
-- Render queue management
-- Webhook handlers for video completion
+| Function | Purpose | Status |
+|----------|---------|--------|
+| `render-video` | Shotstack rendering | **Replace** |
+| `check-render-status` | Poll Shotstack | **Replace** |
+| `generate-storyboard` | AI headlines | **Enhance** with motion params |
+| `render-remotion` | Remotion Lambda trigger | **New** |
+| `generate-motion-config` | Claude motion direction | **New** |
+| `remotion-webhook` | Render completion handler | **New** |
 
 ---
 
-## 📱 Responsive Design
-- Full desktop experience
-- Tablet-optimized layout
-- Mobile-friendly (viewing/downloading)
-- Touch-friendly controls
+## Required Secrets
+
+| Secret | Purpose | Provider |
+|--------|---------|----------|
+| `LOVABLE_API_KEY` | Claude via Lovable AI | Pre-configured |
+| `AWS_ACCESS_KEY_ID` | Remotion Lambda auth | User provides |
+| `AWS_SECRET_ACCESS_KEY` | Remotion Lambda auth | User provides |
+| `REMOTION_AWS_REGION` | Lambda region | User provides |
+| `REMOTION_FUNCTION_NAME` | Lambda function name | User provides |
 
 ---
 
-## 🚀 Implementation Phases
+## Dependencies to Add
 
-**Phase 1: Foundation**
-- Dark theme design system
-- Landing page
-- Authentication flow
-- Dashboard shell
+```json
+{
+  "remotion": "^4.0.0",
+  "@remotion/player": "^4.0.0",
+  "@remotion/cli": "^4.0.0"
+}
+```
 
-**Phase 2: Upload & Configuration**
-- Media upload system
-- Style selection
-- Duration picker
-- Project creation flow
+For edge functions (Deno):
+```
+@remotion/lambda-client@4.0.265
+```
 
-**Phase 3: AI Integration**
-- Lovable AI setup
-- Visual analysis edge function
-- Storyboard generation
-- Text generation
+---
 
-**Phase 4: Editor**
-- Timeline interface
-- Scene reordering
-- Text editing
-- Music library & player
-- Brand customization
+## Technical Details
 
-**Phase 5: Video Generation**
-- Video API integration architecture
-- Render queue system
-- Processing screen
-- Preview & download page
+### Remotion Composition Structure
 
-**Phase 6: Polish**
-- Animations & transitions
-- Error handling
-- Loading states
-- Mobile optimization
+```text
+remotion/
+├── src/
+│   ├── Root.tsx                 # Registers all compositions
+│   ├── compositions/
+│   │   └── DemoTrailer.tsx      # Main trailer (accepts inputProps)
+│   ├── components/
+│   │   ├── Scene.tsx            # Single scene wrapper
+│   │   ├── KineticText.tsx      # Character-by-character reveals
+│   │   ├── MotionOverlays.tsx   # Particles, vignette, glow
+│   │   └── Transitions.tsx      # Fade, slide, zoom transitions
+│   └── lib/
+│       └── animations.ts        # Spring configs, interpolation helpers
+├── remotion.config.ts
+└── package.json
+```
+
+### Motion Config Schema (from Claude)
+
+```typescript
+interface MotionConfig {
+  animation_style: "bounce-in" | "typewriter" | "slide-mask" | "fade-scale";
+  spring: {
+    damping: number;    // 10-300
+    mass: number;       // 0.1-10
+    stiffness: number;  // 50-1000
+  };
+  stagger_delay_ms: number;  // 20-100 per character
+  entrance_delay_ms: number; // Delay before text appears
+  effects: ("particles" | "vignette" | "glow" | "scanlines")[];
+  camera: {
+    zoom_start: number;
+    zoom_end: number;
+    pan_x: number;
+    pan_y: number;
+  };
+}
+```
+
+---
+
+## Migration Path
+
+1. **Keep Shotstack as fallback** during development
+2. **Feature flag** to toggle between renderers
+3. **Gradual rollout**: Test Remotion on new projects first
+4. **Full migration** once stable
+
+---
+
+## Files to Create
+
+- `remotion/src/Root.tsx`
+- `remotion/src/compositions/DemoTrailer.tsx`
+- `remotion/src/components/Scene.tsx`
+- `remotion/src/components/KineticText.tsx`
+- `remotion/src/components/MotionOverlays.tsx`
+- `remotion/remotion.config.ts`
+- `remotion/package.json`
+- `supabase/functions/render-remotion/index.ts`
+- `supabase/functions/generate-motion-config/index.ts`
+- `supabase/functions/remotion-webhook/index.ts`
+- `src/components/editor/RemotionPreview.tsx`
+
+## Files to Modify
+
+- `src/pages/Editor.tsx` - Use Remotion Player
+- `src/pages/RenderPage.tsx` - Call render-remotion
+- `supabase/functions/generate-storyboard/index.ts` - Add motion params
+- `package.json` - Add Remotion dependencies
+- `supabase/config.toml` - Register new edge functions
+
+## Files to Remove/Deprecate
+
+- `supabase/functions/render-video/index.ts` (after migration)
+- `supabase/functions/check-render-status/index.ts` (after migration)
+- `src/components/editor/PreviewPlayer.tsx` (replaced by RemotionPreview)
+
+---
+
+## Timeline Estimate
+
+- **Phase 1** (Remotion Setup): 2-3 hours
+- **Phase 2** (Port Effects): 3-4 hours
+- **Phase 3** (Claude Integration): 2 hours
+- **Phase 4** (Lambda Integration): 3-4 hours
+- **Phase 5** (Unified Preview): 2-3 hours
+- **Testing & Polish**: 2-3 hours
+
+**Total: ~15-20 hours of implementation**
 
