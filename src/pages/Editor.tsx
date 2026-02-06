@@ -68,6 +68,49 @@ import { BrandingPanel } from "@/components/editor/BrandingPanel";
 import { VoiceoverPanel } from "@/components/editor/VoiceoverPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+// Motion config type for use in components
+interface MotionConfigType {
+  animation_style?: string;
+  spring?: {
+    damping: number;
+    mass: number;
+    stiffness: number;
+    overshootClamping: boolean;
+  };
+  stagger_delay_frames?: number;
+  entrance_delay_frames?: number;
+  effects?: string[];
+  camera?: {
+    zoom_start: number;
+    zoom_end: number;
+    pan_x: number;
+    pan_y: number;
+  };
+  cursor_path?: { 
+    startX: number; 
+    startY: number; 
+    endX: number; 
+    endY: number; 
+    clickFrame?: number;
+  };
+  zoom_targets?: Array<{ 
+    x: number; 
+    y: number; 
+    scale: number; 
+    startFrame: number; 
+    endFrame: number;
+  }>;
+  ui_highlights?: Array<{ 
+    x: number; 
+    y: number; 
+    width: number; 
+    height: number; 
+    label?: string; 
+    delay: number; 
+    duration: number;
+  }>;
+}
+
 interface Scene {
   id: string;
   order_index: number;
@@ -75,11 +118,34 @@ interface Scene {
   subtext: string;
   duration_ms: number;
   transition: string;
+  zoom_level?: number;
+  pan_x?: number;
+  pan_y?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  motion_config?: MotionConfigType | any;
   asset?: {
     file_url: string;
     file_type: string;
   };
 }
+
+// Helper to transform database scenes to our Scene type
+const transformDbScene = (dbScene: any): Scene => ({
+  id: dbScene.id,
+  order_index: dbScene.order_index,
+  headline: dbScene.headline || "",
+  subtext: dbScene.subtext || "",
+  duration_ms: dbScene.duration_ms,
+  transition: dbScene.transition || "fade",
+  zoom_level: dbScene.zoom_level,
+  pan_x: dbScene.pan_x,
+  pan_y: dbScene.pan_y,
+  motion_config: dbScene.motion_config,
+  asset: dbScene.asset ? {
+    file_url: dbScene.asset.file_url,
+    file_type: dbScene.asset.file_type,
+  } : undefined,
+});
 
 interface Project {
   id: string;
@@ -390,9 +456,10 @@ const Editor = () => {
         .order("order_index");
 
       if (scenesData && scenesData.length > 0) {
-        setScenes(scenesData);
-        resetHistory(scenesData);
-        setSelectedScene(scenesData[0]?.id || null);
+        const transformedScenes = scenesData.map(transformDbScene);
+        setScenes(transformedScenes);
+        resetHistory(transformedScenes);
+        setSelectedScene(transformedScenes[0]?.id || null);
       } else if (assetsData && assetsData.length > 0) {
         // Auto-generate scenes from assets
         const generatedScenes = assetsData.map((asset, index) => ({
@@ -412,9 +479,10 @@ const Editor = () => {
           .insert(generatedScenes)
           .select("*, asset:assets(*)");
 
-        setScenes(insertedScenes || []);
-        resetHistory(insertedScenes || []);
-        if (insertedScenes?.[0]) setSelectedScene(insertedScenes[0].id);
+        const transformedInserted = (insertedScenes || []).map(transformDbScene);
+        setScenes(transformedInserted);
+        resetHistory(transformedInserted);
+        if (transformedInserted[0]) setSelectedScene(transformedInserted[0].id);
       }
 
       setIsLoading(false);
@@ -461,7 +529,8 @@ const Editor = () => {
     setScenes(newScenes);
     setSceneHistory(newScenes);
 
-    await supabase.from("scenes").update(updates).eq("id", sceneId);
+    // Cast to any for Supabase update compatibility
+    await supabase.from("scenes").update(updates as any).eq("id", sceneId);
   };
 
   const handleAddScene = async () => {
@@ -502,10 +571,11 @@ const Editor = () => {
     }
 
     if (insertedScene) {
-      const newScenes = [...scenes, insertedScene];
+      const transformedScene = transformDbScene(insertedScene);
+      const newScenes = [...scenes, transformedScene];
       setScenes(newScenes);
       setSceneHistory(newScenes);
-      setSelectedScene(insertedScene.id);
+      setSelectedScene(transformedScene.id);
       toast({
         title: "Scene added",
         description: "New scene has been added to your project.",
@@ -664,8 +734,9 @@ const Editor = () => {
           .select();
 
         if (insertedScenes) {
-          setScenes(insertedScenes);
-          setSelectedScene(insertedScenes[0].id);
+          const transformedScenes = insertedScenes.map(transformDbScene);
+          setScenes(transformedScenes);
+          setSelectedScene(transformedScenes[0]?.id || null);
         }
       } else {
         // Update existing scenes with AI-generated content

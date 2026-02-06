@@ -107,29 +107,41 @@ serve(async (req) => {
       .update({ status: "processing", started_at: new Date().toISOString(), progress: 5 })
       .eq("id", renderId);
 
-    // Prepare input props for Remotion
+    // Prepare input props for Remotion - now properly including motion_config from database
     const inputProps = {
-      scenes: scenes.map((scene: Scene) => ({
-        id: scene.id,
-        headline: scene.headline || "",
-        subtext: scene.subtext || "",
-        imageUrl: scene.asset?.file_url || "",
-        durationInFrames: Math.round((scene.duration_ms / 1000) * 30),
-        motionConfig: {
-          animation_style: "bounce-in",
-          spring: { damping: 10, mass: 1, stiffness: 100, overshootClamping: false },
-          stagger_delay_frames: 2,
-          entrance_delay_frames: 5,
-          effects: ["vignette", "glow", "particles"],
+      scenes: scenes.map((scene: any) => {
+        // Parse motion_config from database (stored as JSONB)
+        const storedMotionConfig = scene.motion_config || {};
+        
+        // Build complete motion config by merging stored config with camera data
+        const motionConfig = {
+          animation_style: storedMotionConfig.animation_style || "bounce-in",
+          spring: storedMotionConfig.spring || { damping: 10, mass: 1, stiffness: 100, overshootClamping: false },
+          stagger_delay_frames: storedMotionConfig.stagger_delay_frames || 2,
+          entrance_delay_frames: storedMotionConfig.entrance_delay_frames || 5,
+          effects: storedMotionConfig.effects || ["vignette", "glow", "particles"],
           camera: {
             zoom_start: 1.0,
-            zoom_end: scene.zoom_level || 1.15,
+            zoom_end: scene.zoom_level || 1.3,
             pan_x: scene.pan_x || 0,
             pan_y: scene.pan_y || 0,
           },
-        },
-        transition: mapTransition(scene.transition),
-      })),
+          // Include demo effects from stored config
+          cursor_path: storedMotionConfig.cursor_path || undefined,
+          zoom_targets: storedMotionConfig.zoom_targets || undefined,
+          ui_highlights: storedMotionConfig.ui_highlights || undefined,
+        };
+
+        return {
+          id: scene.id,
+          headline: scene.headline || "",
+          subtext: scene.subtext || "",
+          imageUrl: scene.asset?.file_url || "",
+          durationInFrames: Math.round((scene.duration_ms / 1000) * 30),
+          motionConfig,
+          transition: mapTransition(scene.transition),
+        };
+      }),
       brandColor: project.brand_color || "#8B5CF6",
       logoUrl: project.logo_url || undefined,
       fps: 30,

@@ -69,41 +69,46 @@ const springPresets = {
 };
 
 // Generate cursor paths and zoom targets for demo-style scenes
+// Uses percentage-based coordinates for proper positioning across all viewport sizes
 const generateDemoEffects = (sceneType: string, sceneIndex: number, durationFrames: number): Partial<MotionConfig> => {
   const effects: Partial<MotionConfig> = {};
   
-  // Add cursor animation for feature and reveal scenes
-  if (sceneType === "feature" || sceneType === "reveal") {
+  // Add cursor animation for MORE scene types (not just feature/reveal)
+  // Using percentage-based positions that translate to screen coordinates
+  if (["feature", "reveal", "benefit", "tension"].includes(sceneType)) {
+    // Generate varied cursor paths across the screen (20-80% range)
+    const baseX = 200 + (sceneIndex * 150) % 600; // 200-800px range on 1920 width
+    const baseY = 150 + (sceneIndex * 100) % 400; // 150-550px range on 1080 height
     effects.cursor_path = {
-      startX: 100,
-      startY: 100,
-      endX: 500 + (sceneIndex * 50) % 300,
-      endY: 300 + (sceneIndex * 30) % 200,
-      clickFrame: Math.floor(durationFrames * 0.7),
+      startX: baseX,
+      startY: baseY,
+      endX: baseX + 300 + (sceneIndex * 80) % 200, // Move 300-500px right
+      endY: baseY + 200 + (sceneIndex * 60) % 150, // Move 200-350px down
+      clickFrame: Math.floor(durationFrames * 0.65),
     };
   }
   
-  // Add zoom targets for tension and climax scenes
-  if (sceneType === "tension" || sceneType === "climax") {
+  // Add zoom spotlight targets to MORE scenes for dramatic focus effect
+  if (["tension", "climax", "feature", "reveal", "hook"].includes(sceneType)) {
     effects.zoom_targets = [{
-      x: 50 + (sceneIndex * 10) % 30,
-      y: 40 + (sceneIndex * 5) % 20,
-      scale: 1.8,
-      startFrame: Math.floor(durationFrames * 0.2),
-      endFrame: Math.floor(durationFrames * 0.8),
+      x: 35 + (sceneIndex * 12) % 35, // 35-70% from left (centered area)
+      y: 30 + (sceneIndex * 10) % 30, // 30-60% from top
+      scale: 1.5 + (sceneIndex * 0.15) % 0.5, // 1.5-2.0x zoom
+      startFrame: Math.floor(durationFrames * 0.1),
+      endFrame: Math.floor(durationFrames * 0.75),
     }];
   }
   
-  // Add UI highlights for benefit scenes
-  if (sceneType === "benefit" || sceneType === "feature") {
+  // Add UI highlight callouts to benefit, feature, AND reveal scenes
+  if (["benefit", "feature", "reveal"].includes(sceneType)) {
     effects.ui_highlights = [{
-      x: 300 + (sceneIndex * 100) % 400,
-      y: 200 + (sceneIndex * 50) % 200,
-      width: 200,
-      height: 60,
-      label: sceneIndex === 0 ? undefined : "Key Feature",
-      delay: 15,
-      duration: durationFrames - 30,
+      x: 250 + (sceneIndex * 130) % 550, // Spread across screen
+      y: 150 + (sceneIndex * 90) % 350,
+      width: 240,
+      height: 70,
+      label: sceneIndex % 2 === 0 ? "Key Feature" : undefined,
+      delay: 18,
+      duration: durationFrames - 35,
     }];
   }
   
@@ -117,6 +122,7 @@ const getMotionConfigForSceneType = (sceneType: string, sceneIndex: number, tota
   
   switch (sceneType) {
     case "hook":
+      // Hook scenes now get zoom targets for dramatic opening
       return {
         animation_style: "bounce-in",
         spring: springPresets.elastic,
