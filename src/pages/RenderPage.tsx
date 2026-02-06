@@ -27,7 +27,7 @@ const RenderPage = () => {
   const [messageIndex, setMessageIndex] = useState(0);
   const [project, setProject] = useState<any>(null);
   const [renderId, setRenderId] = useState<string | null>(null);
-  const [shotstackRenderIds, setShotstackRenderIds] = useState<any>(null);
+  const [renderIds, setRenderIds] = useState<Record<string, string> | null>(null);
   const [renderer, setRenderer] = useState<"remotion" | "shotstack" | "remotion-dev">("remotion");
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
@@ -83,8 +83,7 @@ const RenderPage = () => {
       }
 
       // Store render IDs (works for both Remotion and Shotstack fallback)
-      const renderIdKey = data.renderer === "shotstack" ? "shotstackRenderIds" : "remotionRenderIds";
-      setShotstackRenderIds(data.renderIds);
+      setRenderIds(data.renderIds);
       setRenderer(data.renderer || "remotion");
       setIsStarting(false);
       setProgress(10);
@@ -102,7 +101,7 @@ const RenderPage = () => {
 
   // Check render status periodically
   useEffect(() => {
-    if (!renderId || !shotstackRenderIds || error) return;
+    if (!renderId || !renderIds || error) return;
 
     const checkStatus = async () => {
       try {
@@ -111,10 +110,13 @@ const RenderPage = () => {
           ? "check-render-status" 
           : "check-remotion-status";
         
-        const bodyKey = renderer === "shotstack" ? "shotstackRenderIds" : "remotionRenderIds";
+        // Send render IDs with the correct key for each status checker
+        const body = renderer === "shotstack"
+          ? { renderId, shotstackRenderIds: renderIds }
+          : { renderId, remotionRenderIds: renderIds };
         
         const { data, error: fnError } = await supabase.functions.invoke(statusFunction, {
-          body: { renderId, [bodyKey]: shotstackRenderIds },
+          body,
         });
 
         if (fnError) throw fnError;
@@ -157,7 +159,7 @@ const RenderPage = () => {
     // Check every 3 seconds
     const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
-  }, [renderId, shotstackRenderIds, projectId, navigate, toast, error, renderer]);
+  }, [renderId, renderIds, projectId, navigate, toast, error, renderer]);
 
   // Start render on mount
   useEffect(() => {
