@@ -83,6 +83,7 @@ const NewDemo = () => {
         const isSingleAsset = data.isSingleAsset || files.length === 1;
 
         // Create scenes with AI-generated Netflix-style content including full motion config
+        // Use amplified pan values for dramatic Ken Burns camera movement
         const scenesToInsert = data.scenes.map((scene: any, index: number) => ({
           project_id: projectId,
           // For single asset, all scenes use the first asset
@@ -92,11 +93,12 @@ const NewDemo = () => {
           subtext: scene.subtext || "",
           duration_ms: scene.duration_ms || Math.floor((selectedDuration * 1000) / data.scenes.length),
           transition: scene.transition || (scene.scene_type === "hook" ? "fade" : "slide-left"),
-          zoom_level: scene.zoom_level || 1.2,
-          pan_x: scene.pan_direction === "left" ? -5 : scene.pan_direction === "right" ? 5 : 0,
-          pan_y: scene.pan_direction === "up" ? -3 : scene.pan_direction === "down" ? 3 : 0,
-          // Store the full motion config from AI generation
-          motion_config: scene.motion_config || null,
+          zoom_level: scene.zoom_level || 1.3,
+          // Amplified pan values: ±10 instead of ±5 for more dramatic camera movement
+          pan_x: scene.pan_direction === "left" ? -10 : scene.pan_direction === "right" ? 10 : 0,
+          pan_y: scene.pan_direction === "up" ? -8 : scene.pan_direction === "down" ? 8 : 0,
+          // Store the full motion config from AI generation with complete data
+          motion_config: scene.motion_config ? JSON.parse(JSON.stringify(scene.motion_config)) : null,
         }));
 
         await supabase.from("scenes").insert(scenesToInsert);

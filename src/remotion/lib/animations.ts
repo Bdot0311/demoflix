@@ -142,7 +142,7 @@ export const getStaggeredSpring = (
   });
 };
 
-// Ken Burns effect calculator
+// Ken Burns effect calculator with amplified camera movement
 export const getKenBurnsTransform = (
   frame: number,
   durationInFrames: number,
@@ -151,10 +151,13 @@ export const getKenBurnsTransform = (
   const progress = frame / durationInFrames;
   const eased = easeInOutCubic(progress);
 
+  // Amplify pan values for more dramatic camera movement (2.5x multiplier for cinematic effect)
+  const panMultiplier = 2.5;
+
   return {
     scale: config.zoom_start + (config.zoom_end - config.zoom_start) * eased,
-    translateX: config.pan_x * eased,
-    translateY: config.pan_y * eased,
+    translateX: config.pan_x * panMultiplier * eased,
+    translateY: config.pan_y * panMultiplier * eased,
   };
 };
 
