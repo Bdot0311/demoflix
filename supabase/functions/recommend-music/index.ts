@@ -27,13 +27,28 @@ serve(async (req) => {
   try {
     const { scenes, availableTracks, projectStyle } = await req.json();
     
+    // Validate required inputs
+    if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "scenes array is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!availableTracks || !Array.isArray(availableTracks) || availableTracks.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "availableTracks array is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
     // Build context from scenes
-    const sceneDescriptions = scenes.map((scene: Scene, index: number) => 
+    const sceneDescriptions = scenes.map((scene: Scene, index: number) =>
       `Scene ${index + 1}: "${scene.headline || 'No headline'}" - ${scene.subtext || 'No subtext'} (Transition: ${scene.transition || 'fade'})`
     ).join("\n");
 
