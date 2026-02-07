@@ -90,6 +90,47 @@ const getTransitionForSceneType = (sceneType: string, sceneIndex: number): strin
   }
 };
 
+// Fetch image and convert to base64
+async function fetchImageAsBase64(url: string): Promise<{ mediaType: string; data: string } | null> {
+  try {
+    const response = await fetch(url, { 
+      headers: { 'Accept': 'image/*' },
+      signal: AbortSignal.timeout(10000) // 10s timeout
+    });
+    
+    if (!response.ok) {
+      console.log(`Failed to fetch image ${url}: ${response.status}`);
+      return null;
+    }
+    
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Convert to base64
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    const base64 = btoa(binary);
+    
+    // Map content type to Claude's expected media types
+    let mediaType = 'image/png';
+    if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+      mediaType = 'image/jpeg';
+    } else if (contentType.includes('gif')) {
+      mediaType = 'image/gif';
+    } else if (contentType.includes('webp')) {
+      mediaType = 'image/webp';
+    }
+    
+    return { mediaType, data: base64 };
+  } catch (error) {
+    console.error(`Error fetching image ${url}:`, error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -180,17 +221,26 @@ FOR EACH SCENE provide:
 Return ONLY a valid JSON array like this example:
 [{"order_index":0,"headline":"STILL DOING THIS MANUALLY?","subtext":"","duration_ms":${sceneDuration},"scene_type":"pain-point","zoom_level":1.3,"pan_direction":"center"},{"order_index":1,"headline":"TIME TO CHANGE","subtext":"Meet the smarter way","duration_ms":${sceneDuration},"scene_type":"solution","zoom_level":1.2,"pan_direction":"left"}]`;
 
-    // Build content with images for Claude vision
+    // Build content with images for Claude vision (using base64)
     const content: any[] = [{ type: "text", text: userPrompt }];
 
+    // Process up to 4 images (to keep request size reasonable)
     if (imageUrls?.length > 0) {
-      for (const url of imageUrls.slice(0, 8)) {
-        if (url.match(/\.(jpg|jpeg|png|gif|webp)/i)) {
+      const imagesToProcess = imageUrls
+        .filter((url: string) => url.match(/\.(jpg|jpeg|png|gif|webp)/i))
+        .slice(0, 4);
+      
+      console.log(`Processing ${imagesToProcess.length} images for vision`);
+      
+      for (const url of imagesToProcess) {
+        const imageData = await fetchImageAsBase64(url);
+        if (imageData) {
           content.push({
             type: "image",
             source: {
-              type: "url",
-              url: url,
+              type: "base64",
+              media_type: imageData.mediaType,
+              data: imageData.data,
             },
           });
         }
