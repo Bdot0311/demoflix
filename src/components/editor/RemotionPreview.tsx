@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback, memo } from "react";
 import { Player, PlayerRef } from "@remotion/player";
 import { DemoTrailer } from "@/remotion/compositions/DemoTrailer";
 import { SceneData, defaultMotionConfig, springPresets } from "@/remotion/lib/animations";
@@ -6,6 +6,40 @@ import { MotionGraphicsSceneData } from "@/remotion/components/MotionGraphicsSce
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
+
+// Memoized scene indicators to prevent re-renders on every frame
+const SceneIndicators = memo(({ 
+  count, 
+  currentIndex, 
+  sceneStartFrames, 
+  playerRef, 
+  onSceneChange 
+}: { 
+  count: number; 
+  currentIndex: number; 
+  sceneStartFrames: number[];
+  playerRef: React.RefObject<PlayerRef>;
+  onSceneChange?: (index: number) => void;
+}) => (
+  <div className="flex justify-center gap-1 pb-1">
+    {Array.from({ length: count }, (_, idx) => (
+      <button
+        key={idx}
+        onClick={() => {
+          const frame = sceneStartFrames[idx] || 0;
+          playerRef.current?.seekTo(frame);
+          onSceneChange?.(idx);
+        }}
+        className={cn(
+          "w-2 h-2 rounded-full transition-all",
+          idx === currentIndex
+            ? "bg-primary w-6"
+            : "bg-white/40 hover:bg-white/60"
+        )}
+      />
+    ))}
+  </div>
+));
 // Database scene format (from Supabase)
 interface DBScene {
   id: string;
@@ -283,33 +317,35 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
     playerRef.current.seekTo(targetFrame);
   }, [currentSceneIndex, sceneStartFrames]);
 
-  // Handle frame updates
+  // Handle frame updates - throttled to reduce re-renders
+  const lastFrameRef = useRef(0);
+  const lastSceneIdxRef = useRef(currentSceneIndex);
+  
   const handleFrameUpdate = useCallback((frame: number) => {
+    // Only update state if frame changed significantly (every 3 frames = ~10fps state updates)
+    if (Math.abs(frame - lastFrameRef.current) < 3) return;
+    lastFrameRef.current = frame;
+    
     setCurrentFrame(frame);
     
     // Calculate current time in seconds
     const currentTime = (frame / FPS) * 1000; // in milliseconds
     onTimeUpdate?.(currentTime);
 
-    // Determine which scene we're in
-    const sceneList = isMotionGraphics ? motionGraphicsScenes : remotionScenes;
+    // Determine which scene we're in using sceneStartFrames (already computed)
     let sceneIdx = 0;
-    let cumulative = 0;
-    for (let i = 0; i < sceneList.length; i++) {
-      if (frame >= cumulative && frame < cumulative + sceneList[i].durationInFrames) {
+    for (let i = sceneStartFrames.length - 1; i >= 0; i--) {
+      if (frame >= sceneStartFrames[i]) {
         sceneIdx = i;
         break;
       }
-      cumulative += sceneList[i].durationInFrames;
-      if (i === sceneList.length - 1) {
-        sceneIdx = i;
-      }
     }
     
-    if (sceneIdx !== currentSceneIndex) {
+    if (sceneIdx !== lastSceneIdxRef.current) {
+      lastSceneIdxRef.current = sceneIdx;
       onSceneChange?.(sceneIdx);
     }
-  }, [remotionScenes, motionGraphicsScenes, isMotionGraphics, currentSceneIndex, onTimeUpdate, onSceneChange]);
+  }, [sceneStartFrames, onTimeUpdate, onSceneChange]);
 
   // Subscribe to player frame updates via timeupdate event
   useEffect(() => {
@@ -646,25 +682,14 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
             </div>
           </div>
 
-          {/* Scene indicator */}
-          <div className="flex justify-center gap-1 pb-1">
-            {scenes.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  const frame = sceneStartFrames[idx] || 0;
-                  playerRef.current?.seekTo(frame);
-                  onSceneChange?.(idx);
-                }}
-                className={cn(
-                  "w-2 h-2 rounded-full transition-all",
-                  idx === currentSceneIndex
-                    ? "bg-primary w-6"
-                    : "bg-white/40 hover:bg-white/60"
-                )}
-              />
-            ))}
-          </div>
+          {/* Scene indicator - memoized to prevent re-renders */}
+          <SceneIndicators 
+            count={scenes.length}
+            currentIndex={currentSceneIndex}
+            sceneStartFrames={sceneStartFrames}
+            playerRef={playerRef}
+            onSceneChange={onSceneChange}
+          />
         </div>
       </div>
     </div>
