@@ -399,13 +399,15 @@ interface FeatureGridProps {
   brandColor?: string;
 }
 
-export const FeatureGrid: React.FC<FeatureGridProps> = ({
-  features,
-  delay = 0,
-  brandColor = "#8B5CF6",
-}) => {
+// Remotion may attach refs to children in some layouts; forwardRef prevents dev-mode
+// ref warnings that can spam the console during playback and cause jank.
+export const FeatureGrid = React.forwardRef<HTMLDivElement, FeatureGridProps>((
+  { features, delay = 0, brandColor = "#8B5CF6" },
+  ref
+) => {
   return (
     <div
+      ref={ref}
       style={{
         display: "flex",
         gap: 32,
@@ -426,4 +428,6 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({
       ))}
     </div>
   );
-};
+});
+FeatureGrid.displayName = "FeatureGrid";
+
