@@ -5,9 +5,11 @@ interface BrandingData {
   colors?: {
     primary?: string;
     secondary?: string;
+    accent?: string;
     background?: string;
   };
   fonts?: { family: string }[];
+  tagline?: string;
 }
 
 interface PageData {
@@ -15,6 +17,43 @@ interface PageData {
   title: string;
   screenshot?: string;
   description?: string;
+  markdown?: string;
+  headlines?: string[];
+}
+
+interface FeatureData {
+  title: string;
+  description?: string;
+  icon?: string;
+  image?: string;
+}
+
+interface TestimonialData {
+  quote: string;
+  author?: string;
+  role?: string;
+  company?: string;
+  avatar?: string;
+}
+
+interface StatData {
+  value: string;
+  label: string;
+}
+
+interface ContentData {
+  companyName?: string;
+  tagline?: string;
+  valueProposition?: string;
+  headlines: string[];
+  features: FeatureData[];
+  testimonials: TestimonialData[];
+  stats: StatData[];
+  ctaTexts: string[];
+  painPoints: string[];
+  benefits: string[];
+  demoVideos: string[];
+  productImages: string[];
 }
 
 interface ScrapeResult {
@@ -29,6 +68,7 @@ interface ScrapeResult {
     description?: string;
     sourceURL: string;
   };
+  content?: ContentData;
   error?: string;
 }
 
@@ -41,10 +81,10 @@ export interface CreationProgress {
 }
 
 const STEPS = {
-  SCRAPING: { step: 1 as ProgressStep, message: "Capturing website pages..." },
+  SCRAPING: { step: 1 as ProgressStep, message: "Scraping everything from website..." },
   CREATING: { step: 2 as ProgressStep, message: "Creating your project..." },
-  UPLOADING: { step: 3 as ProgressStep, message: "Processing screenshots..." },
-  GENERATING: { step: 4 as ProgressStep, message: "AI is crafting your story..." },
+  UPLOADING: { step: 3 as ProgressStep, message: "Processing media assets..." },
+  GENERATING: { step: 4 as ProgressStep, message: "AI is crafting your cinematic story..." },
   FINISHING: { step: 5 as ProgressStep, message: "Preparing editor..." },
 };
 
@@ -303,7 +343,7 @@ export async function createDemoFromUrl(
     }
   }
   
-  // Step 4: Generate AI storyboard
+  // Step 4: Generate AI storyboard with ALL scraped content
   onProgress(STEPS.GENERATING);
   
   try {
@@ -315,6 +355,21 @@ export async function createDemoFromUrl(
           style,
           duration,
           assetCount: assetUrls.length,
+          // Pass ALL the scraped website content to AI
+          websiteContent: scrapeData.content || {
+            companyName: scrapeData.metadata?.title,
+            tagline: scrapeData.branding?.tagline,
+            valueProposition: scrapeData.metadata?.description,
+            headlines: [],
+            features: [],
+            testimonials: [],
+            stats: [],
+            ctaTexts: [],
+            painPoints: [],
+            benefits: [],
+            demoVideos: scrapeData.videos || [],
+            productImages: scrapeData.images || [],
+          },
         },
       }
     );

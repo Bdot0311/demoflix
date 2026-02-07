@@ -227,7 +227,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrls, style, duration, assetCount } = await req.json();
+    const { imageUrls, style, duration, assetCount, websiteContent } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -241,6 +241,52 @@ serve(async (req) => {
       : assetCount;
 
     const sceneDuration = Math.floor((duration * 1000) / targetSceneCount);
+
+    // Build context from scraped website content
+    let contentContext = "";
+    if (websiteContent) {
+      const parts: string[] = [];
+      
+      if (websiteContent.companyName) {
+        parts.push(`COMPANY: ${websiteContent.companyName}`);
+      }
+      if (websiteContent.tagline) {
+        parts.push(`TAGLINE: ${websiteContent.tagline}`);
+      }
+      if (websiteContent.valueProposition) {
+        parts.push(`VALUE PROP: ${websiteContent.valueProposition}`);
+      }
+      if (websiteContent.headlines && websiteContent.headlines.length > 0) {
+        parts.push(`KEY HEADLINES: ${websiteContent.headlines.slice(0, 8).join(" | ")}`);
+      }
+      if (websiteContent.features && websiteContent.features.length > 0) {
+        const featureList = websiteContent.features.slice(0, 5).map((f: any) => 
+          f.title + (f.description ? `: ${f.description.slice(0, 50)}` : "")
+        ).join("; ");
+        parts.push(`FEATURES: ${featureList}`);
+      }
+      if (websiteContent.testimonials && websiteContent.testimonials.length > 0) {
+        const quote = websiteContent.testimonials[0];
+        parts.push(`TESTIMONIAL: "${quote.quote?.slice(0, 100)}" - ${quote.author || "Customer"}`);
+      }
+      if (websiteContent.stats && websiteContent.stats.length > 0) {
+        const statList = websiteContent.stats.slice(0, 3).map((s: any) => `${s.value} ${s.label}`).join(", ");
+        parts.push(`STATS: ${statList}`);
+      }
+      if (websiteContent.painPoints && websiteContent.painPoints.length > 0) {
+        parts.push(`PAIN POINTS: ${websiteContent.painPoints.slice(0, 3).join("; ")}`);
+      }
+      if (websiteContent.benefits && websiteContent.benefits.length > 0) {
+        parts.push(`BENEFITS: ${websiteContent.benefits.slice(0, 3).join("; ")}`);
+      }
+      if (websiteContent.ctaTexts && websiteContent.ctaTexts.length > 0) {
+        parts.push(`CTAs: ${websiteContent.ctaTexts.slice(0, 3).join(", ")}`);
+      }
+      
+      if (parts.length > 0) {
+        contentContext = `\n\n## WEBSITE CONTENT TO USE (IMPORTANT - use this actual copy!)\n${parts.join("\n")}`;
+      }
+    }
 
     // STORY-DRIVEN system prompt for Netflix-style trailers
     const systemPrompt = `You are a world-class motion graphics director who creates viral Netflix-style product demo trailers. Your trailers follow a PROVEN narrative structure that keeps viewers hooked:
@@ -257,11 +303,19 @@ Every trailer MUST follow this emotional arc:
 3. **HOW IT WORKS** (Scenes 3-5): Step-by-step feature walkthrough with action verbs.
    - Examples: "Connect in seconds", "Automate everything", "See results instantly"
    
-4. **RESULT/PROOF** (Scene 6): Show the transformation/outcome.
+4. **RESULT/PROOF** (Scene 6): Show the transformation/outcome with real stats if available.
    - Examples: "3x more conversions", "Hours saved every week", "Teams love it"
    
 5. **CTA** (Final Scene): Urgent, compelling call to action.
    - Examples: "Start free today", "Join 10,000+ teams", "Try it now"
+
+## CRITICAL: USE THE WEBSITE CONTENT
+When website content is provided:
+- USE the actual company name, features, and tagline
+- INCORPORATE real stats and testimonials
+- ADAPT headlines from the website copy
+- MATCH the brand's tone and language
+- DO NOT make up generic copy - use what's provided!
 
 ## YOUR SIGNATURE STYLE
 - Headlines are 2-5 words MAX. Pure impact.
@@ -276,17 +330,20 @@ You design for animation - each scene type gets specific treatment:
 - solution: Quick scale-pop (eureka moment)
 - workflow/how-it-works: Clean line-reveal (clarity)
 - result: Dramatic scale-pop (celebration)
-- cta: Punchy scale-pop (urgency)`;
+- cta: Punchy scale-pop (urgency)${contentContext}`;
 
     const userPrompt = isSingleAsset 
       ? `Create a ${duration}-second STORY-DRIVEN Netflix-style trailer from ONE product screenshot. Generate exactly ${targetSceneCount} scenes following this structure:
 
 SCENE STRUCTURE:
 - Scene 1 (PAIN-POINT): ${targetSceneCount > 5 ? "Start with viewer's frustration" : "Hook with a problem"}
-- Scene 2 (SOLUTION): "It's time to change" pivot moment
+- Scene 2 (SOLUTION): "It's time to change" pivot moment  
 - Scenes 3-${targetSceneCount - 2} (WORKFLOW): Feature demonstrations with action verbs
-- Scene ${targetSceneCount - 1} (RESULT): Show the transformation/benefit
-- Scene ${targetSceneCount} (CTA): Compelling call to action
+- Scene ${targetSceneCount - 1} (RESULT): Show the transformation/benefit${websiteContent?.stats?.length > 0 ? " - USE REAL STATS!" : ""}
+- Scene ${targetSceneCount} (CTA): Compelling call to action${websiteContent?.ctaTexts?.length > 0 ? " - USE PROVIDED CTAs!" : ""}
+
+${websiteContent?.companyName ? `COMPANY NAME: ${websiteContent.companyName}` : ""}
+${websiteContent?.features?.length > 0 ? `USE THESE FEATURES: ${websiteContent.features.slice(0, 4).map((f: any) => f.title).join(", ")}` : ""}
 
 CRITICAL: Use DIFFERENT zoom_level (1.0-1.8) and pan_direction for EACH scene!
 
@@ -304,8 +361,11 @@ NARRATIVE ARC:
 - Scene 1 (PAIN-POINT): Hook with viewer's frustration
 - Scene 2 (SOLUTION): Pivot to hope/solution
 - Scenes 3-${assetCount - 2} (WORKFLOW): Feature walkthroughs
-- Scene ${assetCount - 1} (RESULT): Show transformation
-- Scene ${assetCount} (CTA): Call to action
+- Scene ${assetCount - 1} (RESULT): Show transformation${websiteContent?.stats?.length > 0 ? " with REAL STATS" : ""}
+- Scene ${assetCount} (CTA): Call to action${websiteContent?.ctaTexts?.length > 0 ? " using PROVIDED CTA" : ""}
+
+${websiteContent?.companyName ? `COMPANY: ${websiteContent.companyName}` : ""}
+${websiteContent?.features?.length > 0 ? `FEATURES TO HIGHLIGHT: ${websiteContent.features.slice(0, 5).map((f: any) => f.title).join(", ")}` : ""}
 
 FOR EACH SCENE:
 1. headline: 2-5 word power statement
