@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { Player, PlayerRef } from "@remotion/player";
 import { DemoTrailer } from "@/remotion/compositions/DemoTrailer";
 import { SceneData, defaultMotionConfig, springPresets } from "@/remotion/lib/animations";
+import { MotionGraphicsSceneData } from "@/remotion/components/MotionGraphicsScene";
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
-
 // Database scene format (from Supabase)
 interface DBScene {
   id: string;
@@ -17,6 +17,27 @@ interface DBScene {
   pan_x?: number;
   pan_y?: number;
   motion_config?: {
+    // Motion graphics mode
+    is_motion_graphics?: boolean;
+    scene_type?: "intro" | "pain-point" | "solution" | "feature" | "stats" | "testimonial" | "cta";
+    voiceover_text?: string;
+    visual_elements?: {
+      features?: Array<{ title: string; description?: string; icon?: string }>;
+      stats?: Array<{ value: string; label: string }>;
+      testimonial?: {
+        quote: string;
+        author?: string;
+        role?: string;
+        company?: string;
+        avatar?: string;
+      };
+      ctaText?: string;
+    };
+    background?: {
+      type?: "gradient" | "particles" | "grid" | "orbs" | "full";
+      colors?: string[];
+    };
+    // Legacy fields for screenshot mode
     animation_style?: string;
     spring?: {
       damping: number;
@@ -188,25 +209,60 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Convert scenes to Remotion format
+  // Detect if this is a motion graphics project (check first scene's motion_config)
+  const isMotionGraphics = useMemo(() => {
+    if (scenes.length === 0) return false;
+    const firstScene = scenes[0];
+    return firstScene.motion_config?.is_motion_graphics === true;
+  }, [scenes]);
+
+  // Convert scenes to Remotion format (for legacy screenshot mode)
   const remotionScenes = useMemo(() => {
+    if (isMotionGraphics) return [];
     return scenes.map((scene) => convertToRemotionScene(scene, fallbackAsset));
-  }, [scenes, fallbackAsset]);
+  }, [scenes, fallbackAsset, isMotionGraphics]);
+
+  // Convert scenes to motion graphics format
+  const motionGraphicsScenes: MotionGraphicsSceneData[] = useMemo(() => {
+    if (!isMotionGraphics) return [];
+    return scenes.map((scene) => {
+      const config = scene.motion_config || {};
+      const sceneFrames = Math.round((scene.duration_ms / 1000) * FPS);
+      
+      return {
+        id: scene.id,
+        type: config.scene_type || "intro",
+        headline: scene.headline || "",
+        subtext: scene.subtext || "",
+        voiceoverText: config.voiceover_text || "",
+        durationInFrames: sceneFrames,
+        transition: (scene.transition as "fade" | "slide" | "zoom") || "fade",
+        visualElements: config.visual_elements || {},
+        background: config.background || { type: "full" as const, colors: ["#0a0a0f", "#1a1a2e"] },
+        animationStyle: (config.animation_style as "dramatic" | "smooth" | "punchy") || "smooth",
+        brandColor: brandColor,
+      };
+    });
+  }, [scenes, isMotionGraphics, brandColor]);
 
   // Calculate total duration in frames
   const totalDurationInFrames = useMemo(() => {
+    if (isMotionGraphics) {
+      return motionGraphicsScenes.reduce((sum, scene) => sum + scene.durationInFrames, 0);
+    }
     return remotionScenes.reduce((sum, scene) => sum + scene.durationInFrames, 0);
-  }, [remotionScenes]);
+  }, [remotionScenes, motionGraphicsScenes, isMotionGraphics]);
 
   // Calculate scene start frames
   const sceneStartFrames = useMemo(() => {
+    const sceneList = isMotionGraphics ? motionGraphicsScenes : remotionScenes;
     let cumulative = 0;
-    return remotionScenes.map((scene) => {
+    return sceneList.map((scene) => {
       const start = cumulative;
       cumulative += scene.durationInFrames;
       return start;
     });
-  }, [remotionScenes]);
+  }, [remotionScenes, motionGraphicsScenes, isMotionGraphics]);
 
   // Sync player with isPlaying prop
   useEffect(() => {
@@ -236,15 +292,16 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
     onTimeUpdate?.(currentTime);
 
     // Determine which scene we're in
+    const sceneList = isMotionGraphics ? motionGraphicsScenes : remotionScenes;
     let sceneIdx = 0;
     let cumulative = 0;
-    for (let i = 0; i < remotionScenes.length; i++) {
-      if (frame >= cumulative && frame < cumulative + remotionScenes[i].durationInFrames) {
+    for (let i = 0; i < sceneList.length; i++) {
+      if (frame >= cumulative && frame < cumulative + sceneList[i].durationInFrames) {
         sceneIdx = i;
         break;
       }
-      cumulative += remotionScenes[i].durationInFrames;
-      if (i === remotionScenes.length - 1) {
+      cumulative += sceneList[i].durationInFrames;
+      if (i === sceneList.length - 1) {
         sceneIdx = i;
       }
     }
@@ -252,7 +309,7 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
     if (sceneIdx !== currentSceneIndex) {
       onSceneChange?.(sceneIdx);
     }
-  }, [remotionScenes, currentSceneIndex, onTimeUpdate, onSceneChange]);
+  }, [remotionScenes, motionGraphicsScenes, isMotionGraphics, currentSceneIndex, onTimeUpdate, onSceneChange]);
 
   // Subscribe to player frame updates via timeupdate event
   useEffect(() => {
@@ -475,6 +532,9 @@ export const RemotionPreview: React.FC<RemotionPreviewProps> = ({
           fps: FPS,
           brandColor,
           logoUrl,
+          // Motion graphics mode
+          isMotionGraphics,
+          motionGraphicsScenes: isMotionGraphics ? motionGraphicsScenes : undefined,
         }}
         durationInFrames={Math.max(1, totalDurationInFrames)}
         fps={FPS}

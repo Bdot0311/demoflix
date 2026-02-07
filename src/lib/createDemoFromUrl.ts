@@ -381,20 +381,36 @@ export async function createDemoFromUrl(
         .eq("project_id", project.id)
         .order("order_index");
       
-      const isSingleAsset = storyboardData.isSingleAsset || assetUrls.length === 1;
+      const isMotionGraphics = storyboardData.isMotionGraphics === true;
       
+      // Create scenes with motion graphics config stored in motion_config
       const scenesToInsert = storyboardData.scenes.map((scene: any, index: number) => ({
         project_id: project.id,
-        asset_id: isSingleAsset ? (assets?.[0]?.id || null) : (assets?.[index]?.id || null),
+        // For motion graphics, we don't need assets - the content IS the visual
+        asset_id: isMotionGraphics ? null : (assets?.[index]?.id || assets?.[0]?.id || null),
         order_index: scene.order_index || index,
         headline: scene.headline || `Scene ${index + 1}`,
         subtext: scene.subtext || "",
         duration_ms: scene.duration_ms || Math.floor((duration * 1000) / storyboardData.scenes.length),
-        transition: scene.transition || (scene.scene_type === "hook" ? "fade" : "slide-left"),
-        zoom_level: scene.zoom_level || 1.3,
-        pan_x: scene.pan_direction === "left" ? -10 : scene.pan_direction === "right" ? 10 : 0,
-        pan_y: scene.pan_direction === "up" ? -8 : scene.pan_direction === "down" ? 8 : 0,
-        motion_config: scene.motion_config ? JSON.parse(JSON.stringify(scene.motion_config)) : null,
+        transition: scene.transition || "fade",
+        zoom_level: scene.zoom_level || 1.0,
+        pan_x: 0,
+        pan_y: 0,
+        // Store ALL motion graphics data in motion_config
+        motion_config: {
+          // Motion graphics mode flag
+          is_motion_graphics: isMotionGraphics,
+          // Scene type for motion graphics
+          scene_type: scene.type || "intro",
+          // Animation style
+          animation_style: scene.animation_style || "smooth",
+          // Visual elements (features, stats, testimonials, CTA)
+          visual_elements: scene.visual_elements || {},
+          // Background configuration
+          background: scene.background || { type: "full", colors: ["#0a0a0f", "#1a1a2e"] },
+          // Voiceover text for narration sync
+          voiceover_text: scene.voiceover_text || "",
+        },
       }));
       
       await supabase.from("scenes").insert(scenesToInsert);
