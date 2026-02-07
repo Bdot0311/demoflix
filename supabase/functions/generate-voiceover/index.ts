@@ -145,10 +145,26 @@ Output ONLY the voiceover text, separated by newlines for each scene. No scene n
     );
 
     if (!ttsResponse.ok) {
-      const error = await ttsResponse.text();
-      console.error('ElevenLabs TTS failed:', error);
+      const errorText = await ttsResponse.text();
+      console.error('ElevenLabs TTS failed:', errorText);
+      
+      // Parse the error to provide a helpful message
+      let errorMessage = 'Failed to generate voiceover audio';
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.detail?.status === 'quota_exceeded') {
+          const remaining = errorJson.detail.message?.match(/You have (\d+) credits remaining/)?.[1] || '0';
+          const required = errorJson.detail.message?.match(/(\d+) credits are required/)?.[1] || 'more';
+          errorMessage = `ElevenLabs quota exceeded: ${remaining} credits remaining, ${required} needed. Please add credits to your ElevenLabs account or shorten your demo.`;
+        } else if (errorJson.detail?.message) {
+          errorMessage = errorJson.detail.message;
+        }
+      } catch {
+        // Keep default error message
+      }
+      
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to generate voiceover audio', scripts }),
+        JSON.stringify({ success: false, error: errorMessage, scripts }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
