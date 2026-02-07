@@ -126,18 +126,56 @@ function extractDomain(url: string): string {
   }
 }
 
-async function base64ToBlob(base64: string): Promise<Blob> {
-  // Handle data URL format
-  const base64Data = base64.includes(",") ? base64.split(",")[1] : base64;
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-  
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
+async function screenshotToBlob(screenshot: string): Promise<Blob | null> {
+  // Check if it's a URL (Firecrawl returns URLs, not base64)
+  if (screenshot.startsWith('http://') || screenshot.startsWith('https://')) {
+    try {
+      const response = await fetch(screenshot);
+      if (!response.ok) {
+        console.error('Failed to fetch screenshot URL:', response.status);
+        return null;
+      }
+      return await response.blob();
+    } catch (err) {
+      console.error('Error fetching screenshot URL:', err);
+      return null;
+    }
   }
   
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: "image/png" });
+  // Handle data URL format (data:image/png;base64,...)
+  if (screenshot.startsWith('data:')) {
+    try {
+      const base64Data = screenshot.split(",")[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], { type: "image/png" });
+    } catch (err) {
+      console.error('Error decoding base64:', err);
+      return null;
+    }
+  }
+  
+  // Try raw base64
+  try {
+    const byteCharacters = atob(screenshot);
+    const byteNumbers = new Array(byteCharacters.length);
+    
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: "image/png" });
+  } catch (err) {
+    console.error('Error decoding raw base64:', err);
+    return null;
+  }
 }
 
 export async function createDemoFromUrl(
@@ -197,7 +235,12 @@ export async function createDemoFromUrl(
     });
     
     try {
-      const blob = await base64ToBlob(page.screenshot);
+      const blob = await screenshotToBlob(page.screenshot);
+      if (!blob) {
+        console.error("Failed to convert screenshot to blob");
+        continue;
+      }
+      
       const fileName = `page-${i + 1}.png`;
       const filePath = `${userId}/${project.id}/${Date.now()}-${fileName}`;
       
@@ -233,28 +276,30 @@ export async function createDemoFromUrl(
   if (assetUrls.length === 0) {
     // Fallback: use main screenshot if no pages captured
     if (scrapeData.screenshot) {
-      const blob = await base64ToBlob(scrapeData.screenshot);
-      const filePath = `${userId}/${project.id}/${Date.now()}-main.png`;
+      const blob = await screenshotToBlob(scrapeData.screenshot);
+      if (blob) {
+        const filePath = `${userId}/${project.id}/${Date.now()}-main.png`;
+        
+        await supabase.storage
+          .from("project-assets")
+          .upload(filePath, blob, { contentType: "image/png" });
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from("project-assets")
+          .getPublicUrl(filePath);
       
-      await supabase.storage
-        .from("project-assets")
-        .upload(filePath, blob, { contentType: "image/png" });
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from("project-assets")
-        .getPublicUrl(filePath);
-      
-      assetUrls.push(publicUrl);
-      
-      await supabase.from("assets").insert({
-        project_id: project.id,
-        user_id: userId,
-        file_name: "Homepage",
-        file_url: publicUrl,
-        file_type: "image",
-        file_size: blob.size,
-        order_index: 0,
-      });
+        assetUrls.push(publicUrl);
+        
+        await supabase.from("assets").insert({
+          project_id: project.id,
+          user_id: userId,
+          file_name: "Homepage",
+          file_url: publicUrl,
+          file_type: "image",
+          file_size: blob.size,
+          order_index: 0,
+        });
+      }
     }
   }
   
