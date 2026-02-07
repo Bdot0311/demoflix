@@ -8,7 +8,7 @@ import {
   trailerWithIntroPropsSchema 
 } from "./lib/animations";
 
-// Default props for preview/development
+// Default props for preview/development - SIMPLIFIED
 const defaultScenes: SceneData[] = [
   {
     id: "scene-1",
@@ -18,8 +18,8 @@ const defaultScenes: SceneData[] = [
     durationInFrames: 90,
     motionConfig: {
       ...defaultMotionConfig,
-      animation_style: "bounce-in",
-      camera: { zoom_start: 1.0, zoom_end: 1.2, pan_x: 0, pan_y: 0 },
+      animation_style: "fade-scale",
+      camera: { zoom_start: 1.0, zoom_end: 1.15, pan_x: 0, pan_y: 0 },
     },
     transition: "fade",
   },
@@ -31,10 +31,10 @@ const defaultScenes: SceneData[] = [
     durationInFrames: 90,
     motionConfig: {
       ...defaultMotionConfig,
-      animation_style: "word-stagger",
+      animation_style: "slide",
       camera: { zoom_start: 1.1, zoom_end: 1.0, pan_x: 2, pan_y: -1 },
     },
-    transition: "slide-left",
+    transition: "slide",
   },
   {
     id: "scene-3",
@@ -44,8 +44,8 @@ const defaultScenes: SceneData[] = [
     durationInFrames: 120,
     motionConfig: {
       ...defaultMotionConfig,
-      animation_style: "fade-scale",
-      effects: ["particles", "vignette", "glow"],
+      animation_style: "zoom",
+      effects: ["vignette"],
       camera: { zoom_start: 1.0, zoom_end: 1.15, pan_x: 0, pan_y: 0 },
     },
     transition: "zoom",
@@ -121,7 +121,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="DemoTrailerWithIntro"
         component={DemoTrailerWithIntro}
-        durationInFrames={getTotalDuration(defaultScenes) + 150}
+        durationInFrames={getTotalDuration(defaultScenes) + 75}
         fps={30}
         width={1920}
         height={1080}
@@ -135,8 +135,8 @@ export const RemotionRoot: React.FC = () => {
           logoUrl: undefined,
           introText: "Introducing",
           outroText: "Get Started",
-          introDuration: 60,
-          outroDuration: 90,
+          introDuration: 30,
+          outroDuration: 45,
         }}
       />
     </>

@@ -78,6 +78,26 @@ interface RemotionPreviewProps {
 
 const FPS = 30;
 
+// Map legacy animation styles to new simplified styles
+const mapAnimationStyle = (style?: string): "fade-scale" | "slide" | "zoom" => {
+  switch (style) {
+    case "line-reveal":
+    case "slide-mask":
+    case "word-stagger":
+    case "slide":
+      return "slide";
+    case "blur-in":
+    case "scale-pop":
+    case "zoom":
+      return "zoom";
+    case "fade-scale":
+    case "bounce-in":
+    case "typewriter":
+    default:
+      return "fade-scale";
+  }
+};
+
 // Convert database scene format to Remotion scene format
 const convertToRemotionScene = (
   scene: DBScene, 
@@ -86,31 +106,16 @@ const convertToRemotionScene = (
   const asset = scene.asset || fallbackAsset;
   const storedConfig = scene.motion_config;
   
-  // Build motion config from stored data or use optimized defaults
-  const motionConfig = storedConfig ? {
-    animation_style: (storedConfig.animation_style || "line-reveal") as any,
-    spring: storedConfig.spring || springPresets.crisp,
-    stagger_delay_frames: storedConfig.stagger_delay_frames || 1,
-    entrance_delay_frames: storedConfig.entrance_delay_frames || 4,
-    effects: (storedConfig.effects || ["vignette"]) as any,
+  // Build simplified motion config for performance
+  const motionConfig = {
+    animation_style: mapAnimationStyle(storedConfig?.animation_style),
+    spring: storedConfig?.spring || springPresets.fast,
+    stagger_delay_frames: 0,
+    entrance_delay_frames: storedConfig?.entrance_delay_frames || 3,
+    effects: ["vignette"] as ("vignette")[],
     camera: {
       zoom_start: 1.0,
-      zoom_end: scene.zoom_level || 1.2,
-      pan_x: scene.pan_x || 0,
-      pan_y: scene.pan_y || 0,
-    },
-    // Include demo-style effects from stored config
-    cursor_path: storedConfig.cursor_path,
-    zoom_targets: storedConfig.zoom_targets,
-    ui_highlights: storedConfig.ui_highlights,
-  } : {
-    ...defaultMotionConfig,
-    animation_style: "line-reveal" as const,
-    spring: springPresets.crisp,
-    effects: ["vignette"] as any,
-    camera: {
-      zoom_start: 1.0,
-      zoom_end: scene.zoom_level || 1.2,
+      zoom_end: Math.min(scene.zoom_level || 1.15, 1.5),
       pan_x: scene.pan_x || 0,
       pan_y: scene.pan_y || 0,
     },
@@ -127,23 +132,22 @@ const convertToRemotionScene = (
   };
 };
 
-const mapTransition = (transition?: string): SceneData["transition"] => {
+// Map legacy transitions to new simplified transitions
+const mapTransition = (transition?: string): "fade" | "slide" | "zoom" => {
   switch (transition) {
     case "slide-left":
     case "slide-right":
-    case "zoom":
-    case "fade":
-    case "cross-dissolve":
+    case "slide":
     case "wipe":
-      return transition;
-    case "slide-up":
-    case "slide-down":
-    case "dissolve":
-      return "cross-dissolve"; // Map to new cross-dissolve
+      return "slide";
+    case "zoom":
     case "zoom-in":
     case "zoom-out":
     case "cross-zoom":
       return "zoom";
+    case "fade":
+    case "cross-dissolve":
+    case "dissolve":
     default:
       return "fade";
   }
