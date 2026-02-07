@@ -218,16 +218,16 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
-            <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
+            <img src={demoflixEmblem} alt="DemoFlix" className="h-8 md:h-10 w-auto" />
+            <span className="hidden sm:inline text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <Link to="/new-demo">
-              <Button className="bg-primary hover:bg-primary/90 glow-sm">
-                <Plus className="w-4 h-4 mr-2" />
-                New Demo
+              <Button className="bg-primary hover:bg-primary/90 glow-sm text-sm md:text-base">
+                <Plus className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">New Demo</span>
               </Button>
             </Link>
             <ThemeToggle />
@@ -246,26 +246,26 @@ const Dashboard = () => {
       />
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 md:px-6 py-8 md:py-12">
         {/* Quick Create from URL */}
-        <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
+        <div className="mb-8 md:mb-10 p-4 md:p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border border-primary/20">
+          <div className="flex flex-col gap-4">
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-primary" />
+              <h2 className="text-base md:text-lg font-semibold text-foreground mb-1 flex items-center gap-2">
+                <Globe className="w-4 md:w-5 h-4 md:h-5 text-primary" />
                 Create from URL
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 Paste any website URL and we'll auto-generate a demo trailer
               </p>
             </div>
-            <form onSubmit={handleQuickCreate} className="flex gap-2 flex-1 max-w-md">
+            <form onSubmit={handleQuickCreate} className="flex gap-2 w-full">
               <Input
                 type="url"
                 placeholder="https://your-product.com"
                 value={quickUrl}
                 onChange={(e) => setQuickUrl(e.target.value)}
-                className="bg-background/50 border-primary/30 flex-1"
+                className="bg-background/50 border-primary/30 flex-1 text-sm"
               />
               <Button type="submit" disabled={!quickUrl.trim() || isCreatingFromUrl}>
                 <ArrowRight className="w-4 h-4" />
@@ -274,9 +274,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Your Projects</h1>
-          <p className="text-muted-foreground">Create and manage your cinematic demo trailers</p>
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Your Projects</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Create and manage your cinematic demo trailers</p>
         </div>
 
         {projects.length === 0 ? (
@@ -308,7 +308,7 @@ const Dashboard = () => {
           </div>
         ) : (
           /* Projects Grid */
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {projects.map((project) => (
               <div
                 key={project.id}
