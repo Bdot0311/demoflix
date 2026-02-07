@@ -108,28 +108,24 @@ serve(async (req) => {
       .eq("id", renderId);
 
     // Prepare input props for Remotion - now properly including motion_config from database
+    // SIMPLIFIED input props - minimal motion config for performance
     const inputProps = {
       scenes: scenes.map((scene: any) => {
-        // Parse motion_config from database (stored as JSONB)
         const storedMotionConfig = scene.motion_config || {};
         
-        // Build complete motion config by merging stored config with camera data
+        // Simplified motion config - only essential properties
         const motionConfig = {
-          animation_style: storedMotionConfig.animation_style || "bounce-in",
-          spring: storedMotionConfig.spring || { damping: 10, mass: 1, stiffness: 100, overshootClamping: false },
-          stagger_delay_frames: storedMotionConfig.stagger_delay_frames || 2,
-          entrance_delay_frames: storedMotionConfig.entrance_delay_frames || 5,
-          effects: storedMotionConfig.effects || ["vignette", "glow", "particles"],
+          animation_style: storedMotionConfig.animation_style || "fade-scale",
+          spring: storedMotionConfig.spring || { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+          stagger_delay_frames: 0,
+          entrance_delay_frames: storedMotionConfig.entrance_delay_frames || 3,
+          effects: ["vignette"], // Only vignette for performance
           camera: {
             zoom_start: 1.0,
-            zoom_end: scene.zoom_level || 1.3,
+            zoom_end: Math.min(scene.zoom_level || 1.15, 1.5), // Cap zoom for performance
             pan_x: scene.pan_x || 0,
             pan_y: scene.pan_y || 0,
           },
-          // Include demo effects from stored config
-          cursor_path: storedMotionConfig.cursor_path || undefined,
-          zoom_targets: storedMotionConfig.zoom_targets || undefined,
-          ui_highlights: storedMotionConfig.ui_highlights || undefined,
         };
 
         return {

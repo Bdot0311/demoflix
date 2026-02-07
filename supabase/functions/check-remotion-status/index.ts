@@ -64,7 +64,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           status: "failed",
-          error: render.error_message,
+          error: render.error_message || "Render failed",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -73,19 +73,13 @@ serve(async (req) => {
     // Check if AWS Lambda is configured
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY_ID");
     const awsSecretKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
-    const awsRegion = Deno.env.get("REMOTION_AWS_REGION") || "us-east-1";
     const functionName = Deno.env.get("REMOTION_FUNCTION_NAME");
 
-    // If dev mode (no AWS), simulate progress
+    // DEVELOPMENT MODE: Fast progress simulation (30 seconds total)
     if (!awsAccessKey || !awsSecretKey || !functionName) {
-      // Check if it's a dev render (starts with "dev-") or remotion-dev mode
-      const renderIdValues = Object.values(remotionRenderIds || {});
-      const isDevRender = renderIdValues.length > 0 && renderIdValues.some(
-        (id: any) => typeof id === 'string' && (id.startsWith("dev-") || id.includes("-dev-"))
-      );
-
-      // Always simulate progress in dev mode when no AWS is configured
-      const newProgress = Math.min(render.progress + 12, 100);
+      // Progress increment: 20% per call = ~5 calls to complete
+      const progressIncrement = 20;
+      const newProgress = Math.min(render.progress + progressIncrement, 100);
       
       if (newProgress >= 100) {
         // Complete with placeholder URLs
@@ -110,7 +104,8 @@ serve(async (req) => {
               vertical: "https://placeholder.dev/demo-vertical.mp4",
               square: "https://placeholder.dev/demo-square.mp4",
             },
-            note: "Development mode - configure AWS Lambda for production renders",
+            mode: "development",
+            message: "Development mode complete. Configure AWS Lambda for production renders.",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
@@ -125,42 +120,30 @@ serve(async (req) => {
         JSON.stringify({
           status: "processing",
           progress: newProgress,
-          note: "Development mode - configure AWS Lambda for production renders",
+          mode: "development",
+          message: "Development mode. Configure AWS Lambda for production renders.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Query Remotion Lambda for actual status
-    const statusResults: Record<string, any> = {};
-    
-    for (const [format, remotionId] of Object.entries(remotionRenderIds || {})) {
-      if (!remotionId) continue;
-      
-      try {
-        // In production, this would call Remotion's getRenderProgress API
-        // For now, we rely on webhook updates
-        statusResults[format] = {
-          status: "processing",
-          id: remotionId,
-        };
-      } catch (err) {
-        console.error(`Error checking ${format} status:`, err);
-      }
-    }
-
+    // PRODUCTION MODE: Check actual Remotion Lambda status
+    // For now, rely on webhook updates - return current database state
     return new Response(
       JSON.stringify({
         status: render.status,
         progress: render.progress,
-        details: statusResults,
+        mode: "production",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Status check error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : "Unknown error",
+        status: "error"
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -1,20 +1,22 @@
 import { z } from "zod";
 import { SpringConfig, spring } from "remotion";
 
-// Spring presets for different animation styles - optimized for cinematic feel
+// SIMPLIFIED Spring presets - only 3 core presets for performance
 export const springPresets: Record<string, SpringConfig> = {
-  // Legacy presets (kept for compatibility)
-  bouncy: { damping: 12, mass: 1, stiffness: 100, overshootClamping: false },
-  snappy: { damping: 20, mass: 0.5, stiffness: 200, overshootClamping: false },
-  smooth: { damping: 30, mass: 1, stiffness: 80, overshootClamping: true },
-  gentle: { damping: 25, mass: 1.5, stiffness: 60, overshootClamping: false },
-  elastic: { damping: 8, mass: 0.8, stiffness: 150, overshootClamping: false },
+  // Core presets (primary use)
+  fast: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+  smooth: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
+  bounce: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
   
-  // NEW: Fast cinematic presets for Netflix-style animations
-  instant: { damping: 30, mass: 0.3, stiffness: 400, overshootClamping: true },
-  crisp: { damping: 25, mass: 0.4, stiffness: 300, overshootClamping: true },
-  cinematic: { damping: 35, mass: 0.8, stiffness: 120, overshootClamping: true },
-  punch: { damping: 18, mass: 0.5, stiffness: 350, overshootClamping: false },
+  // Legacy aliases (for backwards compatibility)
+  instant: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+  crisp: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+  cinematic: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
+  punch: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
+  bouncy: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
+  snappy: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+  gentle: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
+  elastic: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
 };
 
 // Zod schemas for Remotion props validation
@@ -58,12 +60,13 @@ export const uiHighlightSchema = z.object({
   duration: z.number(),
 });
 
+// SIMPLIFIED: Only 3 core animation styles
 export const motionConfigSchema = z.object({
-  animation_style: z.enum(["bounce-in", "typewriter", "slide-mask", "fade-scale", "word-stagger", "line-reveal", "blur-in", "scale-pop"]),
+  animation_style: z.enum(["fade-scale", "slide", "zoom"]),
   spring: springConfigSchema,
   stagger_delay_frames: z.number(),
   entrance_delay_frames: z.number(),
-  effects: z.array(z.enum(["particles", "vignette", "glow", "scanlines"])),
+  effects: z.array(z.enum(["vignette"])), // Only vignette for performance
   camera: cameraConfigSchema,
   cursor_path: cursorPathSchema.optional(),
   zoom_targets: z.array(zoomTargetSchema).optional(),
@@ -77,7 +80,7 @@ export const sceneDataSchema = z.object({
   imageUrl: z.string(),
   durationInFrames: z.number(),
   motionConfig: motionConfigSchema,
-  transition: z.enum(["fade", "slide-left", "slide-right", "zoom", "none", "cross-dissolve", "wipe"]),
+  transition: z.enum(["fade", "slide", "zoom"]), // Only 3 transitions
 });
 
 export const trailerPropsSchema = z.object({
@@ -102,16 +105,16 @@ export type SceneData = z.infer<typeof sceneDataSchema>;
 export type TrailerProps = z.infer<typeof trailerPropsSchema>;
 export type TrailerWithIntroProps = z.infer<typeof trailerWithIntroPropsSchema>;
 
-// Default motion config - optimized for smooth cinematic playback
+// SIMPLIFIED default motion config - minimal effects for performance
 export const defaultMotionConfig: MotionConfig = {
-  animation_style: "line-reveal", // Fast full-line reveal instead of per-character
-  spring: springPresets.crisp, // Fast, smooth preset
-  stagger_delay_frames: 1, // Minimal stagger for speed
-  entrance_delay_frames: 5, // Faster entrance
-  effects: ["vignette"], // Minimal effects for performance
+  animation_style: "fade-scale",
+  spring: springPresets.fast,
+  stagger_delay_frames: 0,
+  entrance_delay_frames: 3,
+  effects: ["vignette"],
   camera: {
     zoom_start: 1.0,
-    zoom_end: 1.2,
+    zoom_end: 1.15,
     pan_x: 0,
     pan_y: 0,
   },
@@ -121,7 +124,7 @@ export const defaultMotionConfig: MotionConfig = {
 export const getSpringValue = (
   frame: number,
   fps: number,
-  config: SpringConfig = springPresets.bouncy,
+  config: SpringConfig = springPresets.fast,
   delay: number = 0
 ): number => {
   if (frame < delay) return 0;
@@ -132,13 +135,13 @@ export const getSpringValue = (
   });
 };
 
-// Helper for staggered animations (characters/words)
+// Helper for staggered animations (simplified - words only, no characters)
 export const getStaggeredSpring = (
   frame: number,
   fps: number,
   index: number,
   staggerDelay: number = 2,
-  config: SpringConfig = springPresets.bouncy
+  config: SpringConfig = springPresets.fast
 ): number => {
   const delay = index * staggerDelay;
   if (frame < delay) return 0;
@@ -149,30 +152,28 @@ export const getStaggeredSpring = (
   });
 };
 
-// Ken Burns effect calculator with dramatic cinematic camera movement
+// SIMPLIFIED Ken Burns - subtle movement only, no rotation
 export const getKenBurnsTransform = (
   frame: number,
   durationInFrames: number,
   config: MotionConfig["camera"]
-): { scale: number; translateX: number; translateY: number; rotate: number } => {
+): { scale: number; translateX: number; translateY: number } => {
   const progress = frame / durationInFrames;
-  const eased = easeInOutQuart(progress); // Smoother easing for cinematic feel
-
-  // Dramatic pan multiplier (4x for Netflix-style movement)
-  const panMultiplier = 4.0;
-  
-  // Subtle rotation for documentary feel (max 0.5 degrees)
-  const rotationAmount = Math.sin(progress * Math.PI) * 0.3;
+  const eased = easeOutQuad(progress);
 
   return {
     scale: config.zoom_start + (config.zoom_end - config.zoom_start) * eased,
-    translateX: config.pan_x * panMultiplier * eased,
-    translateY: config.pan_y * panMultiplier * eased,
-    rotate: rotationAmount,
+    translateX: config.pan_x * 2 * eased,
+    translateY: config.pan_y * 2 * eased,
   };
 };
 
-// Easing functions
+// SIMPLIFIED easing - just one smooth easing function
+export const easeOutQuad = (t: number): number => {
+  return 1 - (1 - t) * (1 - t);
+};
+
+// Legacy easing functions (for compatibility)
 export const easeInOutCubic = (t: number): number => {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 };
