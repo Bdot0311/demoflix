@@ -1,107 +1,145 @@
 
-# Plan: Transform Videos into Netflix-Style Cinematic Demos
+# Plan: Rebuild Demo Video Engine Using Remotion + Claude Best Practices
 
-## The Problem
+## Current Problems Identified
 
-Based on analyzing your screen recording vs the example Gojiberry video, there are fundamental differences:
+After analyzing the codebase and comparing to industry best practices:
 
-| Current App | Example Video |
-|-------------|---------------|
-| Slow, laggy text animations | Smooth, synchronized motion |
-| Static overlays on screenshots | Dynamic product walkthrough |
-| Generic AI headlines | Story-driven narrative arc |
-| Disconnected cursor/highlight effects | Purposeful UI demonstrations |
-| Heavy per-character animations | Elegant word/phrase reveals |
-| No voiceover sync | Text synced to narration |
-
----
-
-## Solution: Complete Motion System Overhaul
-
-### Phase 1: Fix Performance Issues
-
-**1.1 Simplify Text Animations**
-- Replace heavy character-by-character "bounce-in" with smoother "word-stagger" and "fade-scale" as defaults
-- Reduce spring physics complexity (lower stiffness, higher damping)
-- Use CSS transforms instead of per-character calculations where possible
-
-**1.2 Optimize Scene Rendering**
-- Memoize expensive calculations more aggressively
-- Reduce overlay complexity (fewer particles, simpler vignettes)
-- Use `will-change` CSS property for smoother transforms
+| Issue | Current Implementation | Industry Standard (Remotion + Claude) |
+|-------|----------------------|--------------------------------------|
+| **Slow preview playback** | Heavy per-frame calculations, complex overlays | Memoization, simpler components, CSS-based effects |
+| **AI generates poor content** | Generic prompts, no visual analysis | Multi-modal vision AI analyzing actual screenshots |
+| **No skills/context** | AI doesn't know Remotion patterns | Claude uses structured "skills" with animation rules |
+| **Rendering pipeline issues** | Complex AWS Lambda setup, stuck renders | Simpler render job management with proper status tracking |
+| **Animations don't match example** | Overly complex spring physics | Industry-proven timing presets, simpler effects |
 
 ---
 
-### Phase 2: Cinematic Scene Structure
+## Solution Architecture
 
-**2.1 Story-Driven Scene Types**
-Add new scene types that match professional demo videos:
-- `pain-point` - Opens with the problem (dark, tense)
-- `solution-intro` - "It's time to change" moment
-- `workflow-step` - Show product in action
-- `result` - Show the outcome/benefit
-- `social-proof` - Testimonials or stats
+### Core Strategy: Simplify Everything
 
-**2.2 Enhanced Transition System**
-- Add `cross-dissolve` for seamless scene blends
-- Add `wipe` transitions with brand colors
-- Smoother zoom transitions (ease-in-out-quart curve)
+The example Gojiberry video succeeds because it's **simple and fast**:
+- Clean text reveals (not bouncy character-by-character)
+- Smooth camera movements (gentle Ken Burns)
+- Minimal overlays (subtle vignette only)
+- Strong narrative (Pain → Solution → Proof → CTA)
+
+We need to strip back complexity and focus on what works.
 
 ---
 
-### Phase 3: Text Reveal Improvements
+## Phase 1: Performance-First Animation Redesign
 
-**3.1 New Animation Styles**
+### 1.1 Simplify KineticText Component
+
+Replace complex animation calculations with CSS-based reveals:
+
+**Changes to `src/remotion/components/KineticText.tsx`:**
+- Make `fade-scale` the default (simplest, fastest)
+- Remove per-character `bounce-in` as default
+- Use CSS `will-change` and `transform` only
+- Pre-calculate animation values outside render
+
+**New approach:**
 ```text
-Current styles:
-- bounce-in (per-character, SLOW)
-- typewriter
-- slide-mask
-- fade-scale
-- word-stagger
-
-New styles to add:
-- line-reveal (reveal entire line at once with mask)
-- split-reveal (text splits from center)
-- blur-in (start blurred, sharpen on reveal)
-- scale-pop (quick pop with slight bounce)
+BEFORE: 20+ spring calculations per frame per character
+AFTER: 1 spring calculation per frame per line
 ```
 
-**3.2 Timing Improvements**
-- Reduce `entrance_delay_frames` defaults (currently too slow)
-- Speed up stagger delays for snappier reveals
-- Add "rhythm presets" that match common music tempos
+### 1.2 Minimal Overlay System
+
+**Changes to `src/remotion/components/MotionOverlays.tsx`:**
+- Reduce `FloatingParticles` from 30 to 8
+- Remove `ScanLines` (causes frame drops)
+- Make `FilmGrain` static (no per-frame seed changes)
+- Simplify `Vignette` to pure CSS gradient
+
+### 1.3 Optimized Scene Component
+
+**Changes to `src/remotion/components/Scene.tsx`:**
+- Remove ZoomSpotlight (too complex for browser preview)
+- Simplify cursor animation timing
+- Use `useMemo` for ALL expensive calculations
+- Reduce Ken Burns rotation (0.3° → 0.1°)
 
 ---
 
-### Phase 4: AI Storyboard Improvements
+## Phase 2: AI Storyboard Overhaul
 
-**4.1 Update System Prompt**
-Make AI generate story-driven narratives like the example:
-- Start with PAIN POINT (hook with a problem)
-- Present the SOLUTION
-- Show HOW IT WORKS (step by step)
-- Demonstrate RESULTS
-- End with CTA
+### 2.1 Vision-First Scene Generation
 
-**4.2 Scene Pacing**
-- Hook scenes: 2-3 seconds (punchy)
-- Explanation scenes: 4-6 seconds (detail)
-- CTA scene: 3-4 seconds (urgency)
+The AI should ANALYZE the uploaded screenshots, not just generate generic text.
+
+**Changes to `supabase/functions/generate-storyboard/index.ts`:**
+
+New system prompt structure:
+```text
+1. VISUAL ANALYSIS
+   - What product is shown in the screenshot?
+   - What UI elements are visible?
+   - What action is being demonstrated?
+
+2. NARRATIVE MAPPING
+   - Scene 1: Hook (identify pain point from product context)
+   - Scene 2: Solution (the product solves this)
+   - Scene 3-N: Features (describe what's visible)
+   - Final: CTA
+
+3. MOTION DESIGN
+   - Simple animations only (fade-scale, line-reveal)
+   - Ken Burns zoom 1.0 → 1.15 max
+   - No complex cursor paths for now
+```
+
+### 2.2 Website Content Integration
+
+When website data is available, use it directly:
+- Use actual taglines as headlines
+- Use real stats as proof points
+- Use extracted CTAs for final scene
+- Match brand voice from scraped copy
 
 ---
 
-### Phase 5: UI/UX Polish
+## Phase 3: Rendering Pipeline Fix
 
-**5.1 Ken Burns Enhancement**
-- Increase pan multiplier from 2.5x to 4x for more dramatic movement
-- Add slight rotation for "documentary feel"
-- Smoother easing curves
+### 3.1 Development Mode Improvements
 
-**5.2 Cursor & Highlight Refinements**
-- Make cursor movements follow natural "demo" patterns
-- Time highlights to appear AFTER cursor reaches destination
-- Add subtle "hover state" effects on UI elements
+**Changes to `supabase/functions/check-remotion-status/index.ts`:**
+- Faster progress simulation (complete in 30 seconds not 120)
+- Generate actual placeholder video URLs
+- Clear error messages when Lambda isn't configured
+
+### 3.2 Render State Management
+
+**Changes to `supabase/functions/render-remotion/index.ts`:**
+- Add timeout handling (fail after 5 minutes)
+- Better error propagation to frontend
+- Log actual Lambda responses for debugging
+
+---
+
+## Phase 4: Simplified Component Library
+
+Create a minimal set of proven animation patterns:
+
+### 4.1 New Animation Presets
+
+```text
+FAST_FADE: { damping: 30, stiffness: 300 } - 10 frame reveal
+SMOOTH_SCALE: { damping: 25, stiffness: 200 } - 15 frame scale
+SUBTLE_SLIDE: { damping: 20, stiffness: 250 } - 12 frame slide
+```
+
+### 4.2 Transition Simplification
+
+Remove complex transitions, keep only:
+- `fade` - Cross-fade (default)
+- `slide` - Horizontal slide
+- `zoom` - Scale transition
+
+Remove: cross-dissolve, wipe (too complex for browser preview)
 
 ---
 
@@ -109,61 +147,83 @@ Make AI generate story-driven narratives like the example:
 
 | File | Changes |
 |------|---------|
-| `src/remotion/components/KineticText.tsx` | Add new animation styles, optimize existing ones |
-| `src/remotion/components/Scene.tsx` | Simplify overlays, improve Ken Burns |
-| `src/remotion/lib/animations.ts` | Add faster spring presets, new easing |
-| `supabase/functions/generate-storyboard/index.ts` | Story-driven AI prompts |
-| `src/remotion/compositions/DemoTrailer.tsx` | Smoother transitions |
-| `src/components/editor/RemotionPreview.tsx` | Performance optimizations |
+| `src/remotion/components/KineticText.tsx` | Simplify to 3 core styles, remove per-character animations |
+| `src/remotion/components/Scene.tsx` | Remove ZoomSpotlight, simplify overlays, optimize Ken Burns |
+| `src/remotion/components/MotionOverlays.tsx` | Reduce particle count, static grain, CSS-only vignette |
+| `src/remotion/compositions/DemoTrailer.tsx` | Remove complex transitions, simpler memoization |
+| `src/remotion/lib/animations.ts` | New fast presets, simpler Ken Burns |
+| `supabase/functions/generate-storyboard/index.ts` | Vision-first AI prompts, use website content |
+| `supabase/functions/check-remotion-status/index.ts` | Faster dev mode, better error handling |
 
 ---
 
-## Expected Results
+## Expected Outcomes
 
 After implementation:
-- **3-5x faster** text reveal animations
-- **Smoother** 60fps playback in preview
-- **Story-driven** demo videos like the example
-- **Professional** motion graphics quality
-- **Better pacing** with dramatic tension/release
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Preview FPS | 15-20 | 45-60 |
+| Text reveal time | 2-3 seconds | 0.3-0.5 seconds |
+| Scene transitions | Janky | Smooth |
+| AI headline quality | Generic | Context-aware |
+| Render reliability | Often stuck | Completes or fails cleanly |
 
 ---
 
 ## Technical Details
 
-### New Spring Presets
+### Simplified Spring Config
 ```typescript
-const springPresets = {
-  // Existing (keep for compatibility)
-  bouncy: { damping: 12, mass: 1, stiffness: 100 },
-  
-  // New fast presets
-  instant: { damping: 30, mass: 0.3, stiffness: 400 },
-  crisp: { damping: 25, mass: 0.4, stiffness: 300 },
-  cinematic: { damping: 35, mass: 0.8, stiffness: 120 },
+// Only 3 presets needed
+export const springPresets = {
+  fast: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+  smooth: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
+  bounce: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
 };
 ```
 
-### New Animation: Line Reveal
+### CSS-Based Text Reveal
 ```typescript
-// Reveal entire line with horizontal mask wipe
-if (style === "line-reveal") {
-  const progress = spring({ frame, fps, config: presets.crisp });
-  return (
-    <div style={{ clipPath: `inset(0 ${100 - progress * 100}% 0 0)` }}>
-      <h1>{text}</h1>
-    </div>
-  );
-}
+// Simple opacity + transform (no per-character)
+const progress = spring({ frame, fps, config: springPresets.fast });
+return (
+  <h1 style={{
+    opacity: progress,
+    transform: `translateY(${(1 - progress) * 20}px)`,
+    willChange: 'opacity, transform',
+  }}>
+    {text}
+  </h1>
+);
 ```
 
-### Story-Driven AI Prompt Structure
+### AI Prompt Structure
 ```text
-TRAILER STRUCTURE:
-Scene 1 (PAIN): "After 100 reach-outs today, maybe someone will respond."
-Scene 2 (PROBLEM): "Your problem isn't what you sell..."
-Scene 3 (SOLUTION): "It's time to change. [Product] does X."
-Scene 4-6 (HOW): Step-by-step feature walkthrough
-Scene 7 (RESULT): "You get 3-5x more replies"
-Scene 8 (CTA): "Try [Product] now. 2-minute setup."
+ROLE: Video motion designer
+
+ANALYZE these product screenshots and create a 5-scene trailer:
+
+SCENE STRUCTURE:
+1. HOOK: What problem does this product solve? (2-4 words)
+2. SOLUTION: "Meet [Product Name]" or "Introducing..."
+3-4. FEATURES: What's shown in the screenshots?
+5. CTA: Strong call to action
+
+RULES:
+- Headlines: 2-5 words MAX
+- Use action verbs: Launch, Build, Create, Transform
+- Match the brand's tone from website copy
 ```
+
+---
+
+## Implementation Order
+
+1. **Performance fixes first** - Get preview running at 45+ FPS
+2. **Simplify animations** - Remove complex effects
+3. **Fix AI prompts** - Use website content properly
+4. **Render pipeline** - Better error handling
+5. **Polish** - Fine-tune timing and transitions
+
+This approach prioritizes getting a working, fast preview before adding complexity back in.
