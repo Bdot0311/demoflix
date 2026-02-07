@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Mic, Loader2, Play, Pause, Volume2, Trash2 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,8 +26,10 @@ interface VoiceoverPanelProps {
   projectStyle: string;
   scenes: Scene[];
   voiceoverUrl: string | null;
+  voiceoverEnabled: boolean;
   onVoiceoverGenerated: (url: string) => void;
   onVoiceoverRemoved: () => void;
+  onVoiceoverToggle: (enabled: boolean) => void;
   disabled?: boolean;
 }
 
@@ -41,8 +44,10 @@ export const VoiceoverPanel = ({
   projectStyle,
   scenes,
   voiceoverUrl,
+  voiceoverEnabled,
   onVoiceoverGenerated,
   onVoiceoverRemoved,
+  onVoiceoverToggle,
   disabled = false,
 }: VoiceoverPanelProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -146,15 +151,32 @@ export const VoiceoverPanel = ({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Mic className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          AI Voiceover
-        </h3>
+      {/* Header with toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Mic className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            AI Voiceover
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="voiceover-toggle" className="text-xs text-muted-foreground">
+            {voiceoverEnabled ? "On" : "Off"}
+          </Label>
+          <Switch
+            id="voiceover-toggle"
+            checked={voiceoverEnabled}
+            onCheckedChange={onVoiceoverToggle}
+            disabled={disabled}
+          />
+        </div>
       </div>
 
-      {voiceoverUrl ? (
+      {!voiceoverEnabled ? (
+        <p className="text-xs text-muted-foreground text-center py-4">
+          Enable voiceover to add AI narration to your demo
+        </p>
+      ) : voiceoverUrl ? (
         // Voiceover exists - show controls
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">

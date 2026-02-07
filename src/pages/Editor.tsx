@@ -217,6 +217,7 @@ const Editor = () => {
   const [storyboardMood, setStoryboardMood] = useState<string | null>(null);
   const [useRemotionPreview, setUseRemotionPreview] = useState(true);
   const [voiceoverUrl, setVoiceoverUrl] = useState<string | null>(null);
+  const [voiceoverEnabled, setVoiceoverEnabled] = useState(false);
 
   // History for undo/redo
   const {
@@ -1339,8 +1340,10 @@ const Editor = () => {
                   projectStyle={project.style}
                   scenes={scenes}
                   voiceoverUrl={voiceoverUrl}
+                  voiceoverEnabled={voiceoverEnabled}
                   onVoiceoverGenerated={setVoiceoverUrl}
                   onVoiceoverRemoved={() => setVoiceoverUrl(null)}
+                  onVoiceoverToggle={setVoiceoverEnabled}
                   disabled={scenes.length === 0}
                 />
               )}
