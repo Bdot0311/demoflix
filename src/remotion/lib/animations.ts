@@ -1,13 +1,20 @@
 import { z } from "zod";
 import { SpringConfig, spring } from "remotion";
 
-// Spring presets for different animation styles
+// Spring presets for different animation styles - optimized for cinematic feel
 export const springPresets: Record<string, SpringConfig> = {
+  // Legacy presets (kept for compatibility)
   bouncy: { damping: 12, mass: 1, stiffness: 100, overshootClamping: false },
   snappy: { damping: 20, mass: 0.5, stiffness: 200, overshootClamping: false },
   smooth: { damping: 30, mass: 1, stiffness: 80, overshootClamping: true },
   gentle: { damping: 25, mass: 1.5, stiffness: 60, overshootClamping: false },
   elastic: { damping: 8, mass: 0.8, stiffness: 150, overshootClamping: false },
+  
+  // NEW: Fast cinematic presets for Netflix-style animations
+  instant: { damping: 30, mass: 0.3, stiffness: 400, overshootClamping: true },
+  crisp: { damping: 25, mass: 0.4, stiffness: 300, overshootClamping: true },
+  cinematic: { damping: 35, mass: 0.8, stiffness: 120, overshootClamping: true },
+  punch: { damping: 18, mass: 0.5, stiffness: 350, overshootClamping: false },
 };
 
 // Zod schemas for Remotion props validation
@@ -52,7 +59,7 @@ export const uiHighlightSchema = z.object({
 });
 
 export const motionConfigSchema = z.object({
-  animation_style: z.enum(["bounce-in", "typewriter", "slide-mask", "fade-scale", "word-stagger"]),
+  animation_style: z.enum(["bounce-in", "typewriter", "slide-mask", "fade-scale", "word-stagger", "line-reveal", "blur-in", "scale-pop"]),
   spring: springConfigSchema,
   stagger_delay_frames: z.number(),
   entrance_delay_frames: z.number(),
@@ -70,7 +77,7 @@ export const sceneDataSchema = z.object({
   imageUrl: z.string(),
   durationInFrames: z.number(),
   motionConfig: motionConfigSchema,
-  transition: z.enum(["fade", "slide-left", "slide-right", "zoom", "none"]),
+  transition: z.enum(["fade", "slide-left", "slide-right", "zoom", "none", "cross-dissolve", "wipe"]),
 });
 
 export const trailerPropsSchema = z.object({
@@ -95,16 +102,16 @@ export type SceneData = z.infer<typeof sceneDataSchema>;
 export type TrailerProps = z.infer<typeof trailerPropsSchema>;
 export type TrailerWithIntroProps = z.infer<typeof trailerWithIntroPropsSchema>;
 
-// Default motion config
+// Default motion config - optimized for smooth cinematic playback
 export const defaultMotionConfig: MotionConfig = {
-  animation_style: "bounce-in",
-  spring: springPresets.bouncy,
-  stagger_delay_frames: 2,
-  entrance_delay_frames: 10,
-  effects: ["vignette", "glow"],
+  animation_style: "line-reveal", // Fast full-line reveal instead of per-character
+  spring: springPresets.crisp, // Fast, smooth preset
+  stagger_delay_frames: 1, // Minimal stagger for speed
+  entrance_delay_frames: 5, // Faster entrance
+  effects: ["vignette"], // Minimal effects for performance
   camera: {
     zoom_start: 1.0,
-    zoom_end: 1.15,
+    zoom_end: 1.2,
     pan_x: 0,
     pan_y: 0,
   },
@@ -142,22 +149,26 @@ export const getStaggeredSpring = (
   });
 };
 
-// Ken Burns effect calculator with amplified camera movement
+// Ken Burns effect calculator with dramatic cinematic camera movement
 export const getKenBurnsTransform = (
   frame: number,
   durationInFrames: number,
   config: MotionConfig["camera"]
-): { scale: number; translateX: number; translateY: number } => {
+): { scale: number; translateX: number; translateY: number; rotate: number } => {
   const progress = frame / durationInFrames;
-  const eased = easeInOutCubic(progress);
+  const eased = easeInOutQuart(progress); // Smoother easing for cinematic feel
 
-  // Amplify pan values for more dramatic camera movement (2.5x multiplier for cinematic effect)
-  const panMultiplier = 2.5;
+  // Dramatic pan multiplier (4x for Netflix-style movement)
+  const panMultiplier = 4.0;
+  
+  // Subtle rotation for documentary feel (max 0.5 degrees)
+  const rotationAmount = Math.sin(progress * Math.PI) * 0.3;
 
   return {
     scale: config.zoom_start + (config.zoom_end - config.zoom_start) * eased,
     translateX: config.pan_x * panMultiplier * eased,
     translateY: config.pan_y * panMultiplier * eased,
+    rotate: rotationAmount,
   };
 };
 
