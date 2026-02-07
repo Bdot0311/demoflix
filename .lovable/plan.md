@@ -1,147 +1,211 @@
 
-# Plan: Connect Anthropic Claude API for Storyboard Generation
+# Plan: Fix Remotion Preview + Cinematic Cursor/UI Highlight Demo Pipeline
 
 ## Overview
-
-Replace the Lovable AI gateway (Gemini) with direct Anthropic Claude API integration for the `generate-storyboard` edge function. This matches the industry-standard "Claude + Remotion" approach used by other demo video tools.
-
----
-
-## Why Claude for Demo Generation?
-
-| Feature | Current (Gemini) | Claude |
-|---------|------------------|--------|
-| Vision analysis | Good | Excellent - better at describing UI elements |
-| Copywriting | Generic | More creative, punchy headlines |
-| JSON reliability | Sometimes broken | Consistent structured output |
-| Context understanding | Basic | Better narrative construction |
+This plan addresses three interconnected issues preventing cinematic demo creation:
+1. Cursor and UI highlight animations exist but are never rendered
+2. AI storyboard generation doesn't create the motion data needed for cursor/highlights
+3. Website scraping misses demo videos and interactive element coordinates
 
 ---
 
-## Implementation Steps
+## Phase 1: Fix Remotion Scene Rendering (High Priority)
 
-### Step 1: Add Anthropic API Key Secret
+### Problem
+The `Scene.tsx` component ignores `cursor_path`, `zoom_targets`, and `ui_highlights` from `motion_config` - these components exist (`CursorAnimation.tsx`, `ZoomHighlight.tsx`) but are never used.
 
-I'll request your Anthropic API key using the secure secrets tool. The key will be stored as `ANTHROPIC_API_KEY` and accessible only in edge functions.
+### Solution
+Update `Scene.tsx` to conditionally render:
+- `DemoCursor` when `motion_config.cursor_path` exists
+- `UIHighlight` components when `motion_config.ui_highlights` array exists  
+- `ZoomHighlight` when `motion_config.zoom_targets` array exists
 
-**Where to get your key:**
-1. Go to [console.anthropic.com](https://console.anthropic.com)
-2. Navigate to API Keys
-3. Create a new key or copy an existing one
-
----
-
-### Step 2: Update generate-storyboard Edge Function
-
-**Changes to `supabase/functions/generate-storyboard/index.ts`:**
-
-1. **Replace API endpoint**: Switch from Lovable AI gateway to Anthropic's Messages API
-2. **Update authentication**: Use `ANTHROPIC_API_KEY` instead of `LOVABLE_API_KEY`
-3. **Adapt message format**: Convert from OpenAI-style to Claude's message format
-4. **Handle vision differently**: Claude uses base64 images in a specific format
-
-**New API call structure:**
 ```text
-Endpoint: https://api.anthropic.com/v1/messages
-Headers:
-  - x-api-key: ANTHROPIC_API_KEY
-  - anthropic-version: 2023-06-01
-  - content-type: application/json
-
-Body format:
-  - model: claude-sonnet-4-20250514 (best balance of speed + quality)
-  - max_tokens: 1024
-  - system: [system prompt]
-  - messages: [{ role: "user", content: [...] }]
+┌─────────────────────────────────────────────────────┐
+│                     Scene.tsx                        │
+├─────────────────────────────────────────────────────┤
+│ ┌─────────────────┐  ┌─────────────────┐           │
+│ │  Background     │  │  KineticText    │           │
+│ │  (Ken Burns)    │  │  (Headlines)    │           │
+│ └─────────────────┘  └─────────────────┘           │
+│                                                      │
+│ ┌─────────────────┐  ┌─────────────────┐  NEW!    │
+│ │  DemoCursor     │  │  UIHighlight    │  ◄────   │
+│ │  (cursor_path)  │  │  (ui_highlights)│           │
+│ └─────────────────┘  └─────────────────┘           │
+│                                                      │
+│ ┌─────────────────┐                                 │
+│ │  ZoomHighlight  │  NEW!                          │
+│ │  (zoom_targets) │                                 │
+│ └─────────────────┘                                 │
+└─────────────────────────────────────────────────────┘
 ```
 
+### Files to Modify
+- `src/remotion/components/Scene.tsx` - Add imports and render cursor/highlight components
+
 ---
 
-### Step 3: Vision Message Format for Claude
+## Phase 2: Upgrade AI Storyboard Generation (Critical)
 
-Claude requires a different format for images:
+### Problem
+Claude prompt only asks for headlines/zoom/pan. It never generates:
+- `cursor_path` (startX, startY, endX, endY, clickFrame)
+- `ui_highlights` (x, y, width, height, label, delay, duration)
+- `zoom_targets` (x, y, scale, startFrame, endFrame)
 
+### Solution
+Rewrite the Claude prompt to act as a **motion designer** that:
+1. Analyzes screenshots to identify interactive UI elements (buttons, forms, nav)
+2. Generates cursor paths that demonstrate product workflow
+3. Creates UI highlight boxes around key features
+4. Adds zoom targets for "hero" moments
+
+### New Prompt Structure
 ```text
-Current (OpenAI/Gemini style):
-{
-  "type": "image_url",
-  "image_url": { "url": "https://..." }
+You are a cinematic motion designer creating Figma/Cursor-style product demos.
+
+For EACH scene, analyze the screenshot and generate:
+1. headline + subtext (2-5 words max)
+2. cursor_path: { startX, startY, endX, endY, clickFrame }
+   - Simulate a user navigating the product
+   - Move to buttons, inputs, key UI elements
+   - Include a click at the moment of action
+
+3. ui_highlights: Array of UI elements to highlight
+   - Identify buttons, features, inputs in the screenshot
+   - Provide x, y (percentage), width, height (pixels)
+   - Add label text like "Click here" or feature name
+
+4. zoom_targets: Zoom into specific UI regions
+   - Hero moments get 1.8x-2.0x zoom
+   - Provide x, y (percentage of screen), scale, timing
+```
+
+### Files to Modify
+- `supabase/functions/generate-storyboard/index.ts` - Enhanced Claude prompt + motion config generation
+
+### MotionConfig Schema Update
+```typescript
+interface MotionConfig {
+  animation_style: "fade-scale" | "slide" | "zoom";
+  spring: {...};
+  effects: ["vignette"];
+  camera: { zoom_start, zoom_end, pan_x, pan_y };
+  
+  // NEW - cursor simulation
+  cursor_path?: {
+    startX: number;    // percentage 0-100
+    startY: number;
+    endX: number;
+    endY: number;
+    clickFrame?: number;
+  };
+  
+  // NEW - UI element highlights
+  ui_highlights?: Array<{
+    x: number;         // percentage
+    y: number;
+    width: number;     // pixels (scaled)
+    height: number;
+    label?: string;
+    delay: number;     // frames
+    duration: number;  // frames
+  }>;
+  
+  // NEW - zoom spotlights
+  zoom_targets?: Array<{
+    x: number;
+    y: number;
+    scale: number;
+    startFrame: number;
+    endFrame: number;
+  }>;
 }
-
-Claude style:
-{
-  "type": "image",
-  "source": {
-    "type": "url",
-    "url": "https://..."
-  }
-}
 ```
 
 ---
 
-### Step 4: Optimize Prompts for Claude
+## Phase 3: Improve Website Scraping (Important)
 
-Claude responds better to structured prompts. I'll update the system prompt to be more Claude-friendly:
+### Problem
+Scrape logs show `Videos: 0` - demo videos (YouTube, Loom, Vimeo iframes) are not being captured.
 
-```text
-You are a Netflix trailer director creating punchy product demo videos.
+### Solution
+1. Expand video regex patterns to catch more embed formats
+2. Use Firecrawl's `html` format and parse for `<video>`, `<iframe>` with video sources
+3. Store video URLs in project metadata for use in CTA scenes
 
-<narrative_structure>
-1. PAIN-POINT: Hook with frustration (2-4 words)
-2. SOLUTION: "Meet [Product]" pivot
-3. WORKFLOW: Feature demonstrations
-4. RESULT: Transformation proof
-5. CTA: Compelling call to action
-</narrative_structure>
-
-<rules>
-- Headlines: 2-5 words MAX
-- Power verbs: Launch, Build, Create, Transform
-- Match brand tone from provided website content
-</rules>
-
-<output_format>
-Return ONLY a valid JSON array with no explanation.
-</output_format>
+### Video Pattern Improvements
+```typescript
+const videoPatterns = [
+  // YouTube (all formats)
+  /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/gi,
+  
+  // Vimeo
+  /(?:player\.vimeo\.com\/video\/|vimeo\.com\/)(\d+)/gi,
+  
+  // Loom (extended)
+  /(?:loom\.com\/share\/|loom\.com\/embed\/|useloom\.com\/share\/)([a-zA-Z0-9]+)/gi,
+  
+  // Wistia
+  /(?:wistia\.com\/medias\/|wistia\.net\/embed\/|fast\.wistia\.net\/embed\/iframe\/)([a-zA-Z0-9]+)/gi,
+  
+  // Vidyard
+  /(?:vidyard\.com\/watch\/|video\.vidyard\.com\/watch\/)([a-zA-Z0-9]+)/gi,
+  
+  // iframe src with video providers
+  /src=["']([^"']*(?:youtube|vimeo|loom|wistia|vidyard)[^"']*)["']/gi,
+];
 ```
+
+### Files to Modify
+- `supabase/functions/scrape-website/index.ts` - Enhanced video extraction patterns
 
 ---
 
-## Files to Modify
+## Phase 4: RemotionPreview Performance Fix
+
+### Problem
+You mentioned "quality/animations wrong" - the preview may be lagging or not showing the new cursor/highlight effects smoothly.
+
+### Solution
+1. Memoize cursor path calculations to prevent re-renders
+2. Use `useMemo` for highlight positions
+3. Ensure the Player component receives updated scenes when motion_config changes
+
+### Files to Modify
+- `src/components/editor/RemotionPreview.tsx` - Pass cursor/highlights to Scene component
+
+---
+
+## Technical Implementation Summary
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/generate-storyboard/index.ts` | Replace Lovable AI with Anthropic Claude API |
-
----
-
-## Technical Details
-
-### Model Selection
-
-**Recommended: `claude-sonnet-4-20250514`**
-- Best balance of quality, speed, and cost
-- Excellent at creative copywriting
-- Strong vision capabilities for UI analysis
-
-Alternative: `claude-3-5-sonnet-20241022` if you want the previous stable version
-
-### Error Handling
-
-Will add proper handling for:
-- Invalid API key (401)
-- Rate limiting (429)
-- Overloaded (529)
-- Input too large (400)
+| `src/remotion/components/Scene.tsx` | Render DemoCursor, UIHighlight, ZoomHighlight based on motion_config |
+| `supabase/functions/generate-storyboard/index.ts` | New Claude prompt for cursor paths + UI highlights + zoom targets |
+| `supabase/functions/scrape-website/index.ts` | Enhanced video regex patterns, iframe parsing |
+| `src/remotion/lib/animations.ts` | Update MotionConfig type to require cursor_path/ui_highlights fields |
 
 ---
 
 ## Expected Outcome
 
 After implementation:
-- Claude analyzes uploaded screenshots for better context
-- More creative, punchy headlines that match brand voice
-- Reliable JSON output without parsing failures
-- Better narrative flow in generated storyboards
+1. **Remotion Preview** will show animated cursor moving to UI elements with click ripples
+2. **UI Highlights** will pulse around buttons/features with labels
+3. **Zoom Spotlights** will dramatically zoom into hero UI moments
+4. **Scraping** will capture demo videos from YouTube/Loom/Vimeo embeds
+5. **AI Generation** will intelligently place cursor/highlights based on screenshot analysis
 
+This transforms the output from "text over screenshot" to "cinematic product walkthrough" matching Cursor/Verbal-style demos.
+
+---
+
+## Testing Checklist
+- [ ] Create demo from URL and verify cursor animations appear
+- [ ] Verify UI highlights pulse around detected buttons
+- [ ] Confirm demo videos are captured in scrape results
+- [ ] Test preview playback at 60fps without stuttering
+- [ ] Verify rendered video matches preview fidelity
