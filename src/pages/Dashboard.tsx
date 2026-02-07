@@ -9,8 +9,12 @@ import {
   Trash2,
   Sparkles,
   Edit3,
-  Loader2
+  Loader2,
+  Globe,
+  Upload
 } from "lucide-react";
+import { CreateFromUrlDialog } from "@/components/CreateFromUrlDialog";
+import { createDemoFromUrl, type CreationProgress } from "@/lib/createDemoFromUrl";
 import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import {
   DropdownMenu,
@@ -37,6 +41,9 @@ const Dashboard = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [showUrlDialog, setShowUrlDialog] = useState(false);
+  const [isCreatingFromUrl, setIsCreatingFromUrl] = useState(false);
+  const [creationProgress, setCreationProgress] = useState<CreationProgress | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -134,6 +141,35 @@ const Dashboard = () => {
     }
   };
 
+  const handleCreateFromUrl = async (url: string) => {
+    setIsCreatingFromUrl(true);
+    setCreationProgress({ step: 1, message: "Starting..." });
+
+    try {
+      const projectId = await createDemoFromUrl(url, user.id, (progress) => {
+        setCreationProgress(progress);
+      });
+
+      toast({
+        title: "Demo created!",
+        description: "Your project is ready to edit.",
+      });
+
+      navigate(`/editor/${projectId}`);
+    } catch (error: any) {
+      console.error("Error creating demo from URL:", error);
+      toast({
+        variant: "destructive",
+        title: "Creation failed",
+        description: error.message || "Failed to create demo from URL.",
+      });
+    } finally {
+      setIsCreatingFromUrl(false);
+      setShowUrlDialog(false);
+      setCreationProgress(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -200,14 +236,25 @@ const Dashboard = () => {
             </div>
             <h2 className="text-2xl font-bold mb-3 text-foreground">Create your first trailer</h2>
             <p className="text-muted-foreground mb-8">
-              Upload screenshots to create a cinematic product demo.
+              Upload screenshots or paste a URL to create a cinematic product demo.
             </p>
-            <Link to="/new-demo">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 glow">
-                <Plus className="w-5 h-5 mr-2" />
-                Upload Files
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                size="lg" 
+                variant="outline"
+                onClick={() => setShowUrlDialog(true)}
+                className="border-primary/50 hover:bg-primary/10"
+              >
+                <Globe className="w-5 h-5 mr-2" />
+                From URL
               </Button>
-            </Link>
+              <Link to="/new-demo">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 glow w-full">
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload Files
+                </Button>
+              </Link>
+            </div>
           </div>
         ) : (
           /* Projects Grid */
@@ -288,6 +335,14 @@ const Dashboard = () => {
           </div>
         )}
       </main>
+
+      <CreateFromUrlDialog
+        open={showUrlDialog}
+        onOpenChange={setShowUrlDialog}
+        onSubmit={handleCreateFromUrl}
+        isCreating={isCreatingFromUrl}
+        progress={creationProgress}
+      />
     </div>
   );
 };
