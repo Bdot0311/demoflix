@@ -30,14 +30,14 @@ interface SceneData {
   motion_config: MotionConfig;
 }
 
-// SIMPLIFIED spring presets - only 3
+// Simplified spring presets
 const springPresets = {
   fast: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
   smooth: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
   bounce: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
 };
 
-// SIMPLIFIED motion config - maps scene type to animation
+// Motion config based on scene type
 const getMotionConfigForSceneType = (sceneType: string): MotionConfig => {
   switch (sceneType) {
     case "pain-point":
@@ -73,7 +73,7 @@ const getMotionConfigForSceneType = (sceneType: string): MotionConfig => {
   }
 };
 
-// SIMPLIFIED transitions - only fade, slide, zoom
+// Transition based on scene type
 const getTransitionForSceneType = (sceneType: string, sceneIndex: number): string => {
   if (sceneIndex === 0) return "fade";
   
@@ -97,10 +97,10 @@ serve(async (req) => {
 
   try {
     const { imageUrls, style, duration, assetCount, websiteContent } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error("ANTHROPIC_API_KEY is not configured");
     }
 
     // Scene count: 5-7 for single asset, or match asset count
@@ -142,25 +142,28 @@ serve(async (req) => {
       }
       
       if (parts.length > 0) {
-        contentContext = `\n\nWEBSITE CONTENT (USE THIS!):\n${parts.join("\n")}`;
+        contentContext = `\n\n<website_content>\n${parts.join("\n")}\n</website_content>`;
       }
     }
 
-    // VISION-FIRST system prompt
-    const systemPrompt = `You are a Netflix-style trailer director. Create punchy, emotional product trailers.
+    // Claude-optimized system prompt with XML structure
+    const systemPrompt = `You are a Netflix trailer director creating punchy product demo videos.
 
-NARRATIVE STRUCTURE (MANDATORY):
-1. PAIN-POINT: Open with frustration (2-4 words max)
+<narrative_structure>
+1. PAIN-POINT: Hook with frustration (2-4 words max)
 2. SOLUTION: "Meet [Product]" pivot moment
 3. WORKFLOW: Feature demonstrations (action verbs)
 4. RESULT: Show transformation with stats if available
 5. CTA: Compelling call to action
+</narrative_structure>
 
-RULES:
+<rules>
 - Headlines: 2-5 words MAX
 - Use power verbs: Launch, Build, Create, Transform, Automate
 - Match brand tone from website content
-- Every scene must evoke emotion${contentContext}`;
+- Every scene must evoke emotion
+- Return ONLY valid JSON, no explanation
+</rules>${contentContext}`;
 
     const userPrompt = `Create ${targetSceneCount} scenes for a ${duration}-second trailer.
 
@@ -174,31 +177,40 @@ FOR EACH SCENE provide:
 - zoom_level: 1.0-1.5
 - pan_direction: "left", "right", "up", "down", or "center"
 
-Return ONLY a valid JSON array.`;
+Return ONLY a valid JSON array like this example:
+[{"order_index":0,"headline":"STILL DOING THIS MANUALLY?","subtext":"","duration_ms":${sceneDuration},"scene_type":"pain-point","zoom_level":1.3,"pan_direction":"center"},{"order_index":1,"headline":"TIME TO CHANGE","subtext":"Meet the smarter way","duration_ms":${sceneDuration},"scene_type":"solution","zoom_level":1.2,"pan_direction":"left"}]`;
 
-    const exampleJson = `[{"order_index":0,"headline":"STILL DOING THIS MANUALLY?","subtext":"","duration_ms":${sceneDuration},"scene_type":"pain-point","zoom_level":1.3,"pan_direction":"center"},{"order_index":1,"headline":"TIME TO CHANGE","subtext":"Meet the smarter way","duration_ms":${sceneDuration},"scene_type":"solution","zoom_level":1.2,"pan_direction":"left"}]`;
-
-    // Build content with images for vision analysis
-    const content: any[] = [{ type: "text", text: userPrompt + "\n\nExample:\n" + exampleJson }];
+    // Build content with images for Claude vision
+    const content: any[] = [{ type: "text", text: userPrompt }];
 
     if (imageUrls?.length > 0) {
       for (const url of imageUrls.slice(0, 8)) {
         if (url.match(/\.(jpg|jpeg|png|gif|webp)/i)) {
-          content.push({ type: "image_url", image_url: { url } });
+          content.push({
+            type: "image",
+            source: {
+              type: "url",
+              url: url,
+            },
+          });
         }
       }
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    console.log("Calling Claude API with", content.length, "content blocks");
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1024,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content },
         ],
       }),
@@ -206,28 +218,34 @@ Return ONLY a valid JSON array.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("Claude API error:", response.status, errorText);
       
+      if (response.status === 401) {
+        return new Response(
+          JSON.stringify({ error: "Invalid Anthropic API key. Please check your credentials." }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again." }),
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
+      if (response.status === 529) {
         return new Response(
-          JSON.stringify({ error: "AI credits exhausted. Please add credits." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Claude is overloaded. Please try again shortly." }),
+          { status: 529, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`Claude API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content_text = data.choices?.[0]?.message?.content || "";
+    const content_text = data.content?.[0]?.text || "";
 
-    console.log("AI Response:", content_text.slice(0, 500));
+    console.log("Claude Response:", content_text.slice(0, 500));
 
     // Parse JSON from response
     let scenes: any[] = [];
@@ -237,7 +255,7 @@ Return ONLY a valid JSON array.`;
         scenes = JSON.parse(jsonMatch[0]);
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
+      console.error("Failed to parse Claude response:", parseError);
     }
 
     // Fallback scenes if AI fails
@@ -254,7 +272,6 @@ Return ONLY a valid JSON array.`;
       ];
 
       scenes = Array.from({ length: targetSceneCount }, (_, i) => {
-        const idx = Math.min(i, fallbackScenes.length - 1);
         const scene = i === 0 ? fallbackScenes[0] 
           : i === targetSceneCount - 1 ? fallbackScenes[fallbackScenes.length - 1]
           : fallbackScenes[Math.min(i, fallbackScenes.length - 2)];
