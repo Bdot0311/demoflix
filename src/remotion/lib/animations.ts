@@ -91,6 +91,9 @@ export const trailerPropsSchema = z.object({
   fps: z.number(),
   brandColor: z.string().optional(),
   logoUrl: z.string().optional(),
+  // Motion graphics mode
+  isMotionGraphics: z.boolean().optional(),
+  motionGraphicsScenes: z.array(z.any()).optional(),
 });
 
 export const trailerWithIntroPropsSchema = trailerPropsSchema.extend({
@@ -99,6 +102,7 @@ export const trailerWithIntroPropsSchema = trailerPropsSchema.extend({
   introDuration: z.number().optional(),
   outroDuration: z.number().optional(),
 });
+
 
 // TypeScript types inferred from schemas
 export type MotionConfig = z.infer<typeof motionConfigSchema>;

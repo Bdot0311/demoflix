@@ -1,10 +1,9 @@
 import React from "react";
 import { Composition } from "remotion";
-import { DemoTrailer, DemoTrailerWithIntro } from "./compositions/DemoTrailer";
+import { DemoTrailer, DemoTrailerWithIntro, extendedTrailerPropsSchema } from "./compositions/DemoTrailer";
 import { 
   SceneData, 
   defaultMotionConfig, 
-  trailerPropsSchema,
   trailerWithIntroPropsSchema 
 } from "./lib/animations";
 
@@ -68,7 +67,7 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1920}
         height={1080}
-        schema={trailerPropsSchema}
+        schema={extendedTrailerPropsSchema}
         defaultProps={{
           scenes: defaultScenes,
           width: 1920,
@@ -76,6 +75,8 @@ export const RemotionRoot: React.FC = () => {
           fps: 30,
           brandColor: "#8B5CF6",
           logoUrl: undefined,
+          isMotionGraphics: false,
+          motionGraphicsScenes: undefined,
         }}
       />
 
@@ -87,7 +88,7 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
-        schema={trailerPropsSchema}
+        schema={extendedTrailerPropsSchema}
         defaultProps={{
           scenes: defaultScenes,
           width: 1080,
@@ -95,6 +96,8 @@ export const RemotionRoot: React.FC = () => {
           fps: 30,
           brandColor: "#8B5CF6",
           logoUrl: undefined,
+          isMotionGraphics: false,
+          motionGraphicsScenes: undefined,
         }}
       />
 
@@ -106,7 +109,7 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1080}
-        schema={trailerPropsSchema}
+        schema={extendedTrailerPropsSchema}
         defaultProps={{
           scenes: defaultScenes,
           width: 1080,
@@ -114,6 +117,8 @@ export const RemotionRoot: React.FC = () => {
           fps: 30,
           brandColor: "#8B5CF6",
           logoUrl: undefined,
+          isMotionGraphics: false,
+          motionGraphicsScenes: undefined,
         }}
       />
 
