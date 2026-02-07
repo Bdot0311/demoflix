@@ -5,6 +5,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface CursorPath {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  clickFrame?: number;
+}
+
+interface UIHighlight {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  label?: string;
+  delay: number;
+  duration: number;
+}
+
+interface ZoomTarget {
+  x: number;
+  y: number;
+  scale: number;
+  startFrame: number;
+  endFrame: number;
+}
+
 interface MotionConfig {
   animation_style: "fade-scale" | "slide" | "zoom";
   spring: {
@@ -16,6 +42,15 @@ interface MotionConfig {
   stagger_delay_frames: number;
   entrance_delay_frames: number;
   effects: ("vignette")[];
+  camera: {
+    zoom_start: number;
+    zoom_end: number;
+    pan_x: number;
+    pan_y: number;
+  };
+  cursor_path?: CursorPath;
+  ui_highlights?: UIHighlight[];
+  zoom_targets?: ZoomTarget[];
 }
 
 interface SceneData {
@@ -37,65 +72,12 @@ const springPresets = {
   bounce: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
 };
 
-// Motion config based on scene type
-const getMotionConfigForSceneType = (sceneType: string): MotionConfig => {
-  switch (sceneType) {
-    case "pain-point":
-    case "hook":
-      return {
-        animation_style: "fade-scale",
-        spring: springPresets.smooth,
-        stagger_delay_frames: 0,
-        entrance_delay_frames: 3,
-        effects: ["vignette"],
-      };
-    case "solution":
-    case "result":
-    case "cta":
-      return {
-        animation_style: "zoom",
-        spring: springPresets.bounce,
-        stagger_delay_frames: 0,
-        entrance_delay_frames: 4,
-        effects: ["vignette"],
-      };
-    case "workflow":
-    case "feature":
-    case "how-it-works":
-    default:
-      return {
-        animation_style: "slide",
-        spring: springPresets.fast,
-        stagger_delay_frames: 0,
-        entrance_delay_frames: 3,
-        effects: ["vignette"],
-      };
-  }
-};
-
-// Transition based on scene type
-const getTransitionForSceneType = (sceneType: string, sceneIndex: number): string => {
-  if (sceneIndex === 0) return "fade";
-  
-  switch (sceneType) {
-    case "solution":
-    case "result":
-    case "cta":
-      return "zoom";
-    case "workflow":
-    case "feature":
-      return "slide";
-    default:
-      return "fade";
-  }
-};
-
 // Fetch image and convert to base64
 async function fetchImageAsBase64(url: string): Promise<{ mediaType: string; data: string } | null> {
   try {
     const response = await fetch(url, { 
       headers: { 'Accept': 'image/*' },
-      signal: AbortSignal.timeout(10000) // 10s timeout
+      signal: AbortSignal.timeout(10000)
     });
     
     if (!response.ok) {
@@ -107,14 +89,12 @@ async function fetchImageAsBase64(url: string): Promise<{ mediaType: string; dat
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Convert to base64
     let binary = '';
     for (let i = 0; i < uint8Array.length; i++) {
       binary += String.fromCharCode(uint8Array[i]);
     }
     const base64 = btoa(binary);
     
-    // Map content type to Claude's expected media types
     let mediaType = 'image/png';
     if (contentType.includes('jpeg') || contentType.includes('jpg')) {
       mediaType = 'image/jpeg';
@@ -151,6 +131,7 @@ serve(async (req) => {
       : assetCount;
 
     const sceneDuration = Math.floor((duration * 1000) / targetSceneCount);
+    const sceneDurationFrames = Math.round((sceneDuration / 1000) * 30); // 30 FPS
 
     // Build context from scraped website content
     let contentContext = "";
@@ -187,16 +168,47 @@ serve(async (req) => {
       }
     }
 
-    // Claude-optimized system prompt with XML structure
-    const systemPrompt = `You are a Netflix trailer director creating punchy product demo videos.
+    // CINEMATIC MOTION DESIGNER PROMPT
+    const systemPrompt = `You are a cinematic motion designer creating Figma/Cursor-style product demo videos. You analyze screenshots to create immersive product walkthroughs with animated cursors and UI highlights.
 
 <narrative_structure>
 1. PAIN-POINT: Hook with frustration (2-4 words max)
-2. SOLUTION: "Meet [Product]" pivot moment
-3. WORKFLOW: Feature demonstrations (action verbs)
+2. SOLUTION: "Meet [Product]" pivot moment  
+3. WORKFLOW: Feature demonstrations with cursor pointing to key UI
 4. RESULT: Show transformation with stats if available
 5. CTA: Compelling call to action
 </narrative_structure>
+
+<motion_design_rules>
+For EACH scene, you must generate:
+
+1. headline + subtext (2-5 words MAX)
+
+2. cursor_path: Simulate a user navigating the product
+   - startX, startY: Where cursor begins (0-100 percentage)
+   - endX, endY: Where cursor moves to (0-100 percentage)
+   - clickFrame: Frame number when click happens (usually 50-70% through scene)
+   - Move cursor TO buttons, inputs, key UI elements you see in the screenshot
+
+3. ui_highlights: Array of 1-2 UI elements to highlight per scene
+   - x, y: Center position (0-100 percentage)
+   - width, height: Size in pixels (scaled for 1920x1080)
+   - label: Short text like "Click here" or feature name
+   - delay: Frames before highlight appears (10-30)
+   - duration: How long highlight shows (40-60 frames)
+
+4. zoom_targets: For hero moments, zoom into specific UI regions
+   - x, y: Center point to zoom into (0-100 percentage)
+   - scale: Zoom level (1.5-2.0 for emphasis)
+   - startFrame, endFrame: Timing of zoom (use for key moments)
+
+ANALYZE THE SCREENSHOTS to identify:
+- Buttons and CTAs (common positions: top-right nav, center hero, bottom)
+- Input fields and forms
+- Feature cards or sections
+- Navigation elements
+- Hero images or product screenshots
+</motion_design_rules>
 
 <rules>
 - Headlines: 2-5 words MAX
@@ -206,7 +218,8 @@ serve(async (req) => {
 - Return ONLY valid JSON, no explanation
 </rules>${contentContext}`;
 
-    const userPrompt = `Create ${targetSceneCount} scenes for a ${duration}-second trailer.
+    const userPrompt = `Create ${targetSceneCount} scenes for a ${duration}-second cinematic trailer.
+Each scene is ${sceneDurationFrames} frames at 30fps.
 
 ${websiteContent?.companyName ? `Company: ${websiteContent.companyName}` : ""}
 ${websiteContent?.features?.length > 0 ? `Features: ${websiteContent.features.slice(0, 3).map((f: any) => f.title).join(", ")}` : ""}
@@ -217,20 +230,38 @@ FOR EACH SCENE provide:
 - scene_type: "pain-point", "solution", "workflow", "feature", "result", or "cta"
 - zoom_level: 1.0-1.5
 - pan_direction: "left", "right", "up", "down", or "center"
+- cursor_path: { startX, startY, endX, endY, clickFrame } - simulate user interaction
+- ui_highlights: Array of { x, y, width, height, label, delay, duration } - highlight key UI
+- zoom_targets: Array of { x, y, scale, startFrame, endFrame } - for dramatic moments
 
-Return ONLY a valid JSON array like this example:
-[{"order_index":0,"headline":"STILL DOING THIS MANUALLY?","subtext":"","duration_ms":${sceneDuration},"scene_type":"pain-point","zoom_level":1.3,"pan_direction":"center"},{"order_index":1,"headline":"TIME TO CHANGE","subtext":"Meet the smarter way","duration_ms":${sceneDuration},"scene_type":"solution","zoom_level":1.2,"pan_direction":"left"}]`;
+IMPORTANT: Analyze any provided screenshots to place cursor and highlights at REAL UI elements.
 
-    // Build content with images for Claude vision (using base64)
+Return ONLY a valid JSON array. Example:
+[
+  {
+    "order_index": 0,
+    "headline": "STILL DOING THIS MANUALLY?",
+    "subtext": "",
+    "duration_ms": ${sceneDuration},
+    "scene_type": "pain-point",
+    "zoom_level": 1.3,
+    "pan_direction": "center",
+    "cursor_path": { "startX": 20, "startY": 30, "endX": 75, "endY": 45, "clickFrame": ${Math.round(sceneDurationFrames * 0.6)} },
+    "ui_highlights": [{ "x": 75, "y": 45, "width": 200, "height": 50, "label": "Old way", "delay": 15, "duration": 50 }],
+    "zoom_targets": [{ "x": 50, "y": 50, "scale": 1.8, "startFrame": 20, "endFrame": ${sceneDurationFrames - 10} }]
+  }
+]`;
+
+    // Build content with images for Claude vision
     const content: any[] = [{ type: "text", text: userPrompt }];
 
-    // Process up to 4 images (to keep request size reasonable)
+    // Process up to 4 images
     if (imageUrls?.length > 0) {
       const imagesToProcess = imageUrls
         .filter((url: string) => url.match(/\.(jpg|jpeg|png|gif|webp)/i))
         .slice(0, 4);
       
-      console.log(`Processing ${imagesToProcess.length} images for vision`);
+      console.log(`Processing ${imagesToProcess.length} images for vision analysis`);
       
       for (const url of imagesToProcess) {
         const imageData = await fetchImageAsBase64(url);
@@ -247,7 +278,7 @@ Return ONLY a valid JSON array like this example:
       }
     }
 
-    console.log("Calling Claude API with", content.length, "content blocks");
+    console.log("Calling Claude API with", content.length, "content blocks for cinematic storyboard");
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -258,7 +289,7 @@ Return ONLY a valid JSON array like this example:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: systemPrompt,
         messages: [
           { role: "user", content },
@@ -295,7 +326,7 @@ Return ONLY a valid JSON array like this example:
     const data = await response.json();
     const content_text = data.content?.[0]?.text || "";
 
-    console.log("Claude Response:", content_text.slice(0, 500));
+    console.log("Claude Response:", content_text.slice(0, 800));
 
     // Parse JSON from response
     let scenes: any[] = [];
@@ -308,23 +339,68 @@ Return ONLY a valid JSON array like this example:
       console.error("Failed to parse Claude response:", parseError);
     }
 
-    // Fallback scenes if AI fails
+    // Fallback scenes with cinematic motion if AI fails
     if (!scenes || scenes.length < 3) {
-      console.log("Using fallback scenes");
+      console.log("Using fallback cinematic scenes");
       
       const fallbackScenes = [
-        { headline: "STILL DOING THIS MANUALLY?", subtext: "", type: "pain-point", zoom: 1.3, pan: "center" },
-        { headline: "TIME TO CHANGE", subtext: "Meet the smarter way", type: "solution", zoom: 1.2, pan: "left" },
-        { headline: "SIMPLE. FAST. POWERFUL.", subtext: "Get started in seconds", type: "workflow", zoom: 1.15, pan: "right" },
-        { headline: "SEE RESULTS INSTANTLY", subtext: "", type: "feature", zoom: 1.25, pan: "up" },
-        { headline: "TEAMS LOVE IT", subtext: "Join thousands of users", type: "result", zoom: 1.2, pan: "center" },
-        { headline: "START FREE TODAY", subtext: "", type: "cta", zoom: 1.0, pan: "center" },
+        { 
+          headline: "STILL DOING THIS MANUALLY?", 
+          subtext: "", 
+          type: "pain-point",
+          cursor: { startX: 20, startY: 20, endX: 80, endY: 60, clickFrame: Math.round(sceneDurationFrames * 0.7) },
+          highlights: [{ x: 80, y: 60, width: 180, height: 45, label: "Old way", delay: 20, duration: 50 }],
+          zoom: { x: 50, y: 50, scale: 1.6, start: 25, end: sceneDurationFrames - 10 }
+        },
+        { 
+          headline: "TIME TO CHANGE", 
+          subtext: "Meet the smarter way", 
+          type: "solution",
+          cursor: { startX: 10, startY: 50, endX: 50, endY: 50, clickFrame: Math.round(sceneDurationFrames * 0.6) },
+          highlights: [{ x: 50, y: 50, width: 250, height: 60, label: "New solution", delay: 15, duration: 55 }],
+          zoom: null
+        },
+        { 
+          headline: "SIMPLE. FAST. POWERFUL.", 
+          subtext: "Get started in seconds", 
+          type: "workflow",
+          cursor: { startX: 30, startY: 30, endX: 70, endY: 70, clickFrame: Math.round(sceneDurationFrames * 0.65) },
+          highlights: [
+            { x: 70, y: 70, width: 150, height: 50, label: "Click here", delay: 20, duration: 45 }
+          ],
+          zoom: null
+        },
+        { 
+          headline: "SEE RESULTS INSTANTLY", 
+          subtext: "", 
+          type: "feature",
+          cursor: { startX: 50, startY: 20, endX: 50, endY: 80, clickFrame: Math.round(sceneDurationFrames * 0.7) },
+          highlights: [],
+          zoom: { x: 50, y: 60, scale: 1.8, start: 15, end: sceneDurationFrames - 15 }
+        },
+        { 
+          headline: "TEAMS LOVE IT", 
+          subtext: "Join thousands of users", 
+          type: "result",
+          cursor: null,
+          highlights: [],
+          zoom: null
+        },
+        { 
+          headline: "START FREE TODAY", 
+          subtext: "", 
+          type: "cta",
+          cursor: { startX: 30, startY: 40, endX: 50, endY: 60, clickFrame: Math.round(sceneDurationFrames * 0.8) },
+          highlights: [{ x: 50, y: 60, width: 200, height: 55, label: "Get Started", delay: 25, duration: 50 }],
+          zoom: null
+        },
       ];
 
       scenes = Array.from({ length: targetSceneCount }, (_, i) => {
-        const scene = i === 0 ? fallbackScenes[0] 
-          : i === targetSceneCount - 1 ? fallbackScenes[fallbackScenes.length - 1]
-          : fallbackScenes[Math.min(i, fallbackScenes.length - 2)];
+        const sceneIdx = i === 0 ? 0 
+          : i === targetSceneCount - 1 ? fallbackScenes.length - 1
+          : Math.min(i, fallbackScenes.length - 2);
+        const scene = fallbackScenes[sceneIdx];
         
         return {
           order_index: i,
@@ -332,17 +408,64 @@ Return ONLY a valid JSON array like this example:
           subtext: scene.subtext,
           duration_ms: sceneDuration,
           scene_type: scene.type,
-          zoom_level: scene.zoom,
-          pan_direction: scene.pan,
+          zoom_level: 1.2,
+          pan_direction: "center",
+          cursor_path: scene.cursor,
+          ui_highlights: scene.highlights,
+          zoom_targets: scene.zoom ? [scene.zoom] : [],
         };
       });
     }
 
-    // Enhance scenes with motion config
+    // Enhance scenes with full motion config
     const enhancedScenes: SceneData[] = scenes.map((scene, i) => {
       const sceneType = scene.scene_type || "feature";
-      const motionConfig = getMotionConfigForSceneType(sceneType);
-      const transition = getTransitionForSceneType(sceneType, i);
+      const sceneFrames = Math.round((scene.duration_ms || sceneDuration) / 1000 * 30);
+      
+      // Build camera config
+      const camera = {
+        zoom_start: 1.0,
+        zoom_end: Math.min(scene.zoom_level || 1.15, 1.5),
+        pan_x: scene.pan_direction === "left" ? -3 : scene.pan_direction === "right" ? 3 : 0,
+        pan_y: scene.pan_direction === "up" ? -2 : scene.pan_direction === "down" ? 2 : 0,
+      };
+
+      // Build motion config with cursor, highlights, zoom targets
+      const motionConfig: MotionConfig = {
+        animation_style: sceneType === "cta" || sceneType === "result" ? "zoom" 
+          : sceneType === "workflow" ? "slide" : "fade-scale",
+        spring: sceneType === "cta" ? springPresets.bounce : springPresets.fast,
+        stagger_delay_frames: 0,
+        entrance_delay_frames: 3,
+        effects: ["vignette"],
+        camera,
+        cursor_path: scene.cursor_path || undefined,
+        ui_highlights: (scene.ui_highlights || []).map((h: any) => ({
+          x: h.x || 50,
+          y: h.y || 50,
+          width: h.width || 150,
+          height: h.height || 50,
+          label: h.label,
+          delay: h.delay || 15,
+          duration: h.duration || Math.min(50, sceneFrames - 20),
+        })),
+        zoom_targets: (scene.zoom_targets || []).map((z: any) => ({
+          x: z.x || 50,
+          y: z.y || 50,
+          scale: z.scale || 1.5,
+          startFrame: z.startFrame || z.start || 20,
+          endFrame: z.endFrame || z.end || sceneFrames - 10,
+        })),
+      };
+
+      // Determine transition
+      let transition = "fade";
+      if (sceneType === "solution" || sceneType === "cta") {
+        transition = "zoom";
+      } else if (sceneType === "workflow" || sceneType === "feature") {
+        transition = "slide";
+      }
+      if (i === 0) transition = "fade";
 
       return {
         order_index: scene.order_index ?? i,
@@ -356,6 +479,8 @@ Return ONLY a valid JSON array like this example:
         motion_config: motionConfig,
       };
     });
+
+    console.log("Generated", enhancedScenes.length, "cinematic scenes with cursor/highlights/zooms");
 
     return new Response(
       JSON.stringify({ 
