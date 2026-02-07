@@ -1,31 +1,71 @@
 import React, { memo, useMemo } from "react";
 import { AbsoluteFill, Sequence, useVideoConfig, Img } from "remotion";
+import { z } from "zod";
 import { Scene } from "../components/Scene";
+import { MotionGraphicsScene, MotionGraphicsSceneData } from "../components/MotionGraphicsScene";
 import { Vignette, GradientOverlay, FilmGrain } from "../components/MotionOverlays";
-import { TrailerProps } from "../lib/animations";
+import { SceneData, sceneDataSchema } from "../lib/animations";
 
-// Memoize Scene to prevent unnecessary re-renders
+// Schema for extended trailer props (for Remotion Composition validation)
+export const extendedTrailerPropsSchema = z.object({
+  scenes: z.array(sceneDataSchema),
+  width: z.number(),
+  height: z.number(),
+  fps: z.number(),
+  brandColor: z.string().optional(),
+  logoUrl: z.string().optional(),
+  isMotionGraphics: z.boolean().optional(),
+  motionGraphicsScenes: z.array(z.any()).optional(),
+});
+
+export type ExtendedTrailerProps = z.infer<typeof extendedTrailerPropsSchema>;
+
+// Memoize Scene components to prevent unnecessary re-renders
 const MemoizedScene = memo(Scene);
+const MemoizedMotionGraphicsScene = memo(MotionGraphicsScene);
 
-export const DemoTrailer: React.FC<TrailerProps> = memo(({
+export const DemoTrailer: React.FC<ExtendedTrailerProps> = memo(({
   scenes,
   brandColor = "#8B5CF6",
   logoUrl,
+  isMotionGraphics = false,
+  motionGraphicsScenes,
 }) => {
+  // Determine which scenes to use
+  const useMotionGraphics = isMotionGraphics && motionGraphicsScenes && motionGraphicsScenes.length > 0;
+  
   // Calculate frame offsets for each scene - memoized
   const sceneOffsets = useMemo(() => {
-    return scenes.reduce<number[]>((acc, scene, index) => {
+    const sceneList = useMotionGraphics ? motionGraphicsScenes! : scenes;
+    return sceneList.reduce<number[]>((acc, scene, index) => {
       if (index === 0) return [0];
       const prevOffset = acc[index - 1];
-      const prevDuration = scenes[index - 1].durationInFrames;
+      const prevDuration = sceneList[index - 1].durationInFrames;
       return [...acc, prevOffset + prevDuration];
     }, []);
-  }, [scenes]);
+  }, [scenes, motionGraphicsScenes, useMotionGraphics]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      {/* Render each scene as a Sequence */}
-      {scenes.map((scene, index) => (
+      {/* Render motion graphics scenes */}
+      {useMotionGraphics && motionGraphicsScenes!.map((scene: MotionGraphicsSceneData, index: number) => (
+        <Sequence
+          key={scene.id}
+          from={sceneOffsets[index]}
+          durationInFrames={scene.durationInFrames}
+          name={`Scene ${index + 1}: ${scene.headline}`}
+        >
+          <MemoizedMotionGraphicsScene
+            scene={scene}
+            isFirst={index === 0}
+            isLast={index === motionGraphicsScenes!.length - 1}
+            brandColor={brandColor}
+          />
+        </Sequence>
+      ))}
+
+      {/* Render legacy scenes (screenshot-based) */}
+      {!useMotionGraphics && scenes.map((scene, index) => (
         <Sequence
           key={scene.id}
           from={sceneOffsets[index]}
@@ -41,8 +81,8 @@ export const DemoTrailer: React.FC<TrailerProps> = memo(({
       ))}
 
       {/* Minimal global overlays for performance */}
-      <GradientOverlay colors={[brandColor, "#06B6D4"]} opacity={0.05} />
-      <FilmGrain intensity={0.015} />
+      <GradientOverlay colors={[brandColor || "#8B5CF6", "#06B6D4"]} opacity={0.03} />
+      <FilmGrain intensity={0.01} />
 
       {/* Logo watermark (optional) */}
       {logoUrl && (
@@ -70,7 +110,7 @@ export const DemoTrailer: React.FC<TrailerProps> = memo(({
 
 // Composition with intro/outro
 export const DemoTrailerWithIntro: React.FC<
-  TrailerProps & {
+  ExtendedTrailerProps & {
     introText?: string;
     outroText?: string;
     introDuration?: number;
