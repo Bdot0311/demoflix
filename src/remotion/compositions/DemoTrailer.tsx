@@ -1,25 +1,30 @@
-import React from "react";
+import React, { memo } from "react";
 import { AbsoluteFill, Sequence, useVideoConfig, Img } from "remotion";
 import { Scene } from "../components/Scene";
 import { Vignette, GradientOverlay, FilmGrain } from "../components/MotionOverlays";
 import { SceneData, TrailerProps } from "../lib/animations";
 
-export const DemoTrailer: React.FC<TrailerProps> = ({
+// Memoize Scene to prevent unnecessary re-renders
+const MemoizedScene = memo(Scene);
+
+export const DemoTrailer: React.FC<TrailerProps> = memo(({
   scenes,
   brandColor = "#8B5CF6",
   logoUrl,
 }) => {
   const { width, height } = useVideoConfig();
 
-  // Calculate frame offsets for each scene
-  const sceneOffsets = scenes.reduce<number[]>((acc, scene, index) => {
-    if (index === 0) {
-      return [0];
-    }
-    const prevOffset = acc[index - 1];
-    const prevDuration = scenes[index - 1].durationInFrames;
-    return [...acc, prevOffset + prevDuration];
-  }, []);
+  // Calculate frame offsets for each scene - memoized
+  const sceneOffsets = React.useMemo(() => {
+    return scenes.reduce<number[]>((acc, scene, index) => {
+      if (index === 0) {
+        return [0];
+      }
+      const prevOffset = acc[index - 1];
+      const prevDuration = scenes[index - 1].durationInFrames;
+      return [...acc, prevOffset + prevDuration];
+    }, []);
+  }, [scenes]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
@@ -31,7 +36,7 @@ export const DemoTrailer: React.FC<TrailerProps> = ({
           durationInFrames={scene.durationInFrames}
           name={`Scene ${index + 1}: ${scene.headline}`}
         >
-          <Scene
+          <MemoizedScene
             scene={scene}
             isFirst={index === 0}
             isLast={index === scenes.length - 1}
@@ -39,9 +44,9 @@ export const DemoTrailer: React.FC<TrailerProps> = ({
         </Sequence>
       ))}
 
-      {/* Global overlays (always visible) */}
-      <GradientOverlay colors={[brandColor, "#06B6D4"]} opacity={0.1} />
-      <FilmGrain intensity={0.03} />
+      {/* Global overlays (always visible) - Reduced intensity for better performance */}
+      <GradientOverlay colors={[brandColor, "#06B6D4"]} opacity={0.08} />
+      <FilmGrain intensity={0.02} />
 
       {/* Logo watermark (optional) */}
       {logoUrl && (
@@ -65,7 +70,7 @@ export const DemoTrailer: React.FC<TrailerProps> = ({
       )}
     </AbsoluteFill>
   );
-};
+});
 
 // Composition with intro/outro
 export const DemoTrailerWithIntro: React.FC<

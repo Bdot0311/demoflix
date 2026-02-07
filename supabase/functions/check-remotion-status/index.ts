@@ -77,71 +77,58 @@ serve(async (req) => {
     const functionName = Deno.env.get("REMOTION_FUNCTION_NAME");
 
     // If dev mode (no AWS), simulate progress
-    if (!awsAccessKey || !awsSecretKey || !functionName || !remotionRenderIds) {
-      // Check if it's a dev render (starts with "dev-")
-      const isDevRender = Object.values(remotionRenderIds || {}).some(
-        (id: any) => typeof id === 'string' && id.startsWith("dev-")
+    if (!awsAccessKey || !awsSecretKey || !functionName) {
+      // Check if it's a dev render (starts with "dev-") or remotion-dev mode
+      const renderIdValues = Object.values(remotionRenderIds || {});
+      const isDevRender = renderIdValues.length > 0 && renderIdValues.some(
+        (id: any) => typeof id === 'string' && (id.startsWith("dev-") || id.includes("-dev-"))
       );
 
-      if (isDevRender) {
-        // Simulate progress for development
-        const newProgress = Math.min(render.progress + 15, 95);
-        
-        if (newProgress >= 95) {
-          // Complete with placeholder URLs
-          await supabase
-            .from("renders")
-            .update({
-              status: "completed",
-              progress: 100,
-              video_url: "https://placeholder.dev/demo-horizontal.mp4",
-              video_url_vertical: "https://placeholder.dev/demo-vertical.mp4",
-              video_url_square: "https://placeholder.dev/demo-square.mp4",
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", renderId);
-
-          return new Response(
-            JSON.stringify({
-              status: "completed",
-              progress: 100,
-              urls: {
-                horizontal: "https://placeholder.dev/demo-horizontal.mp4",
-                vertical: "https://placeholder.dev/demo-vertical.mp4",
-                square: "https://placeholder.dev/demo-square.mp4",
-              },
-              note: "Development mode - placeholder URLs",
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
+      // Always simulate progress in dev mode when no AWS is configured
+      const newProgress = Math.min(render.progress + 12, 100);
+      
+      if (newProgress >= 100) {
+        // Complete with placeholder URLs
         await supabase
           .from("renders")
-          .update({ progress: newProgress })
+          .update({
+            status: "completed",
+            progress: 100,
+            video_url: "https://placeholder.dev/demo-horizontal.mp4",
+            video_url_vertical: "https://placeholder.dev/demo-vertical.mp4",
+            video_url_square: "https://placeholder.dev/demo-square.mp4",
+            completed_at: new Date().toISOString(),
+          })
           .eq("id", renderId);
 
         return new Response(
           JSON.stringify({
-            status: "processing",
-            progress: newProgress,
-            note: "Development mode - simulated progress",
+            status: "completed",
+            progress: 100,
+            urls: {
+              horizontal: "https://placeholder.dev/demo-horizontal.mp4",
+              vertical: "https://placeholder.dev/demo-vertical.mp4",
+              square: "https://placeholder.dev/demo-square.mp4",
+            },
+            note: "Development mode - configure AWS Lambda for production renders",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Fall back to Shotstack status check
-      if (remotionRenderIds && Object.keys(remotionRenderIds).length > 0) {
-        const shotstackResponse = await supabase.functions.invoke("check-render-status", {
-          body: { renderId, shotstackRenderIds: remotionRenderIds },
-        });
-        
-        return new Response(
-          JSON.stringify(shotstackResponse.data || { status: "processing", progress: render.progress }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      await supabase
+        .from("renders")
+        .update({ progress: newProgress })
+        .eq("id", renderId);
+
+      return new Response(
+        JSON.stringify({
+          status: "processing",
+          progress: newProgress,
+          note: "Development mode - configure AWS Lambda for production renders",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Query Remotion Lambda for actual status
