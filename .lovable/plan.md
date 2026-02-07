@@ -1,145 +1,110 @@
 
-# Plan: Rebuild Demo Video Engine Using Remotion + Claude Best Practices
+# Plan: Connect Anthropic Claude API for Storyboard Generation
 
-## Current Problems Identified
+## Overview
 
-After analyzing the codebase and comparing to industry best practices:
-
-| Issue | Current Implementation | Industry Standard (Remotion + Claude) |
-|-------|----------------------|--------------------------------------|
-| **Slow preview playback** | Heavy per-frame calculations, complex overlays | Memoization, simpler components, CSS-based effects |
-| **AI generates poor content** | Generic prompts, no visual analysis | Multi-modal vision AI analyzing actual screenshots |
-| **No skills/context** | AI doesn't know Remotion patterns | Claude uses structured "skills" with animation rules |
-| **Rendering pipeline issues** | Complex AWS Lambda setup, stuck renders | Simpler render job management with proper status tracking |
-| **Animations don't match example** | Overly complex spring physics | Industry-proven timing presets, simpler effects |
+Replace the Lovable AI gateway (Gemini) with direct Anthropic Claude API integration for the `generate-storyboard` edge function. This matches the industry-standard "Claude + Remotion" approach used by other demo video tools.
 
 ---
 
-## Solution Architecture
+## Why Claude for Demo Generation?
 
-### Core Strategy: Simplify Everything
-
-The example Gojiberry video succeeds because it's **simple and fast**:
-- Clean text reveals (not bouncy character-by-character)
-- Smooth camera movements (gentle Ken Burns)
-- Minimal overlays (subtle vignette only)
-- Strong narrative (Pain → Solution → Proof → CTA)
-
-We need to strip back complexity and focus on what works.
+| Feature | Current (Gemini) | Claude |
+|---------|------------------|--------|
+| Vision analysis | Good | Excellent - better at describing UI elements |
+| Copywriting | Generic | More creative, punchy headlines |
+| JSON reliability | Sometimes broken | Consistent structured output |
+| Context understanding | Basic | Better narrative construction |
 
 ---
 
-## Phase 1: Performance-First Animation Redesign
+## Implementation Steps
 
-### 1.1 Simplify KineticText Component
+### Step 1: Add Anthropic API Key Secret
 
-Replace complex animation calculations with CSS-based reveals:
+I'll request your Anthropic API key using the secure secrets tool. The key will be stored as `ANTHROPIC_API_KEY` and accessible only in edge functions.
 
-**Changes to `src/remotion/components/KineticText.tsx`:**
-- Make `fade-scale` the default (simplest, fastest)
-- Remove per-character `bounce-in` as default
-- Use CSS `will-change` and `transform` only
-- Pre-calculate animation values outside render
-
-**New approach:**
-```text
-BEFORE: 20+ spring calculations per frame per character
-AFTER: 1 spring calculation per frame per line
-```
-
-### 1.2 Minimal Overlay System
-
-**Changes to `src/remotion/components/MotionOverlays.tsx`:**
-- Reduce `FloatingParticles` from 30 to 8
-- Remove `ScanLines` (causes frame drops)
-- Make `FilmGrain` static (no per-frame seed changes)
-- Simplify `Vignette` to pure CSS gradient
-
-### 1.3 Optimized Scene Component
-
-**Changes to `src/remotion/components/Scene.tsx`:**
-- Remove ZoomSpotlight (too complex for browser preview)
-- Simplify cursor animation timing
-- Use `useMemo` for ALL expensive calculations
-- Reduce Ken Burns rotation (0.3° → 0.1°)
+**Where to get your key:**
+1. Go to [console.anthropic.com](https://console.anthropic.com)
+2. Navigate to API Keys
+3. Create a new key or copy an existing one
 
 ---
 
-## Phase 2: AI Storyboard Overhaul
-
-### 2.1 Vision-First Scene Generation
-
-The AI should ANALYZE the uploaded screenshots, not just generate generic text.
+### Step 2: Update generate-storyboard Edge Function
 
 **Changes to `supabase/functions/generate-storyboard/index.ts`:**
 
-New system prompt structure:
+1. **Replace API endpoint**: Switch from Lovable AI gateway to Anthropic's Messages API
+2. **Update authentication**: Use `ANTHROPIC_API_KEY` instead of `LOVABLE_API_KEY`
+3. **Adapt message format**: Convert from OpenAI-style to Claude's message format
+4. **Handle vision differently**: Claude uses base64 images in a specific format
+
+**New API call structure:**
 ```text
-1. VISUAL ANALYSIS
-   - What product is shown in the screenshot?
-   - What UI elements are visible?
-   - What action is being demonstrated?
+Endpoint: https://api.anthropic.com/v1/messages
+Headers:
+  - x-api-key: ANTHROPIC_API_KEY
+  - anthropic-version: 2023-06-01
+  - content-type: application/json
 
-2. NARRATIVE MAPPING
-   - Scene 1: Hook (identify pain point from product context)
-   - Scene 2: Solution (the product solves this)
-   - Scene 3-N: Features (describe what's visible)
-   - Final: CTA
-
-3. MOTION DESIGN
-   - Simple animations only (fade-scale, line-reveal)
-   - Ken Burns zoom 1.0 → 1.15 max
-   - No complex cursor paths for now
+Body format:
+  - model: claude-sonnet-4-20250514 (best balance of speed + quality)
+  - max_tokens: 1024
+  - system: [system prompt]
+  - messages: [{ role: "user", content: [...] }]
 ```
-
-### 2.2 Website Content Integration
-
-When website data is available, use it directly:
-- Use actual taglines as headlines
-- Use real stats as proof points
-- Use extracted CTAs for final scene
-- Match brand voice from scraped copy
 
 ---
 
-## Phase 3: Rendering Pipeline Fix
+### Step 3: Vision Message Format for Claude
 
-### 3.1 Development Mode Improvements
+Claude requires a different format for images:
 
-**Changes to `supabase/functions/check-remotion-status/index.ts`:**
-- Faster progress simulation (complete in 30 seconds not 120)
-- Generate actual placeholder video URLs
-- Clear error messages when Lambda isn't configured
+```text
+Current (OpenAI/Gemini style):
+{
+  "type": "image_url",
+  "image_url": { "url": "https://..." }
+}
 
-### 3.2 Render State Management
-
-**Changes to `supabase/functions/render-remotion/index.ts`:**
-- Add timeout handling (fail after 5 minutes)
-- Better error propagation to frontend
-- Log actual Lambda responses for debugging
+Claude style:
+{
+  "type": "image",
+  "source": {
+    "type": "url",
+    "url": "https://..."
+  }
+}
+```
 
 ---
 
-## Phase 4: Simplified Component Library
+### Step 4: Optimize Prompts for Claude
 
-Create a minimal set of proven animation patterns:
-
-### 4.1 New Animation Presets
+Claude responds better to structured prompts. I'll update the system prompt to be more Claude-friendly:
 
 ```text
-FAST_FADE: { damping: 30, stiffness: 300 } - 10 frame reveal
-SMOOTH_SCALE: { damping: 25, stiffness: 200 } - 15 frame scale
-SUBTLE_SLIDE: { damping: 20, stiffness: 250 } - 12 frame slide
+You are a Netflix trailer director creating punchy product demo videos.
+
+<narrative_structure>
+1. PAIN-POINT: Hook with frustration (2-4 words)
+2. SOLUTION: "Meet [Product]" pivot
+3. WORKFLOW: Feature demonstrations
+4. RESULT: Transformation proof
+5. CTA: Compelling call to action
+</narrative_structure>
+
+<rules>
+- Headlines: 2-5 words MAX
+- Power verbs: Launch, Build, Create, Transform
+- Match brand tone from provided website content
+</rules>
+
+<output_format>
+Return ONLY a valid JSON array with no explanation.
+</output_format>
 ```
-
-### 4.2 Transition Simplification
-
-Remove complex transitions, keep only:
-- `fade` - Cross-fade (default)
-- `slide` - Horizontal slide
-- `zoom` - Scale transition
-
-Remove: cross-dissolve, wipe (too complex for browser preview)
 
 ---
 
@@ -147,83 +112,36 @@ Remove: cross-dissolve, wipe (too complex for browser preview)
 
 | File | Changes |
 |------|---------|
-| `src/remotion/components/KineticText.tsx` | Simplify to 3 core styles, remove per-character animations |
-| `src/remotion/components/Scene.tsx` | Remove ZoomSpotlight, simplify overlays, optimize Ken Burns |
-| `src/remotion/components/MotionOverlays.tsx` | Reduce particle count, static grain, CSS-only vignette |
-| `src/remotion/compositions/DemoTrailer.tsx` | Remove complex transitions, simpler memoization |
-| `src/remotion/lib/animations.ts` | New fast presets, simpler Ken Burns |
-| `supabase/functions/generate-storyboard/index.ts` | Vision-first AI prompts, use website content |
-| `supabase/functions/check-remotion-status/index.ts` | Faster dev mode, better error handling |
-
----
-
-## Expected Outcomes
-
-After implementation:
-
-| Metric | Before | After |
-|--------|--------|-------|
-| Preview FPS | 15-20 | 45-60 |
-| Text reveal time | 2-3 seconds | 0.3-0.5 seconds |
-| Scene transitions | Janky | Smooth |
-| AI headline quality | Generic | Context-aware |
-| Render reliability | Often stuck | Completes or fails cleanly |
+| `supabase/functions/generate-storyboard/index.ts` | Replace Lovable AI with Anthropic Claude API |
 
 ---
 
 ## Technical Details
 
-### Simplified Spring Config
-```typescript
-// Only 3 presets needed
-export const springPresets = {
-  fast: { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
-  smooth: { damping: 25, mass: 0.8, stiffness: 150, overshootClamping: true },
-  bounce: { damping: 15, mass: 1, stiffness: 200, overshootClamping: false },
-};
-```
+### Model Selection
 
-### CSS-Based Text Reveal
-```typescript
-// Simple opacity + transform (no per-character)
-const progress = spring({ frame, fps, config: springPresets.fast });
-return (
-  <h1 style={{
-    opacity: progress,
-    transform: `translateY(${(1 - progress) * 20}px)`,
-    willChange: 'opacity, transform',
-  }}>
-    {text}
-  </h1>
-);
-```
+**Recommended: `claude-sonnet-4-20250514`**
+- Best balance of quality, speed, and cost
+- Excellent at creative copywriting
+- Strong vision capabilities for UI analysis
 
-### AI Prompt Structure
-```text
-ROLE: Video motion designer
+Alternative: `claude-3-5-sonnet-20241022` if you want the previous stable version
 
-ANALYZE these product screenshots and create a 5-scene trailer:
+### Error Handling
 
-SCENE STRUCTURE:
-1. HOOK: What problem does this product solve? (2-4 words)
-2. SOLUTION: "Meet [Product Name]" or "Introducing..."
-3-4. FEATURES: What's shown in the screenshots?
-5. CTA: Strong call to action
-
-RULES:
-- Headlines: 2-5 words MAX
-- Use action verbs: Launch, Build, Create, Transform
-- Match the brand's tone from website copy
-```
+Will add proper handling for:
+- Invalid API key (401)
+- Rate limiting (429)
+- Overloaded (529)
+- Input too large (400)
 
 ---
 
-## Implementation Order
+## Expected Outcome
 
-1. **Performance fixes first** - Get preview running at 45+ FPS
-2. **Simplify animations** - Remove complex effects
-3. **Fix AI prompts** - Use website content properly
-4. **Render pipeline** - Better error handling
-5. **Polish** - Fine-tune timing and transitions
+After implementation:
+- Claude analyzes uploaded screenshots for better context
+- More creative, punchy headlines that match brand voice
+- Reliable JSON output without parsing failures
+- Better narrative flow in generated storyboards
 
-This approach prioritizes getting a working, fast preview before adding complexity back in.
