@@ -7,7 +7,7 @@ import {
   AbsoluteFill,
   spring,
 } from "remotion";
-import { KineticText, SubText } from "./KineticText";
+import { KineticText, SubText, AnimationStyle } from "./KineticText";
 import {
   FloatingParticles,
   Vignette,
@@ -139,10 +139,13 @@ export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => 
     transition,
   } = scene;
 
-  // Memoize Ken Burns camera movement calculation
+  // Memoize Ken Burns camera movement calculation (now includes rotation)
   const kenBurns = useMemo(() => 
     getKenBurnsTransform(frame, sceneDuration, motionConfig.camera),
   [frame, sceneDuration, motionConfig.camera]);
+
+  // Map animation style to valid KineticText type
+  const animationStyle = motionConfig.animation_style as AnimationStyle;
 
   // Transition effects
   const transitionDuration = 15; // frames
@@ -211,14 +214,15 @@ export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => 
 
   return (
     <AbsoluteFill style={transitionStyle}>
-      {/* Background Image with Ken Burns */}
+      {/* Background Image with Ken Burns (now includes rotation) */}
       <AbsoluteFill>
         <div
           style={{
             width: "100%",
             height: "100%",
-            transform: `scale(${kenBurns.scale}) translate(${kenBurns.translateX}%, ${kenBurns.translateY}%)`,
+            transform: `scale(${kenBurns.scale}) translate(${kenBurns.translateX}%, ${kenBurns.translateY}%) rotate(${kenBurns.rotate}deg)`,
             transformOrigin: "center center",
+            willChange: "transform",
           }}
         >
           {imageUrl && (
@@ -241,11 +245,11 @@ export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => 
         }}
       />
 
-      {/* Effects layers */}
-      {hasParticles && <FloatingParticles count={25} />}
-      {hasGlow && <GlowEffect color="#8B5CF6" intensity={0.3} />}
-      {hasVignette && <Vignette intensity={0.6} />}
-      {hasScanlines && <ScanLines opacity={0.02} />}
+      {/* Effects layers - Simplified for performance */}
+      {hasParticles && <FloatingParticles count={15} />}
+      {hasGlow && <GlowEffect color="#8B5CF6" intensity={0.2} />}
+      {hasVignette && <Vignette intensity={0.5} />}
+      {hasScanlines && <ScanLines opacity={0.015} />}
 
       {/* Zoom target spotlights */}
       {motionConfig.zoom_targets?.map((target, idx) => (
@@ -288,10 +292,10 @@ export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => 
       {/* Text content */}
       <AbsoluteFill className="flex flex-col items-center justify-center px-16">
         <div className="text-center max-w-4xl">
-          {/* Headline */}
+          {/* Headline - Now uses typed AnimationStyle */}
           <KineticText
             text={headline}
-            style={motionConfig.animation_style}
+            style={animationStyle}
             fontSize={Math.min(width / 12, 80)}
             color="white"
             springConfig={motionConfig.spring}

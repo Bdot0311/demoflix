@@ -32,7 +32,7 @@ interface UIHighlight {
 }
 
 interface MotionConfig {
-  animation_style: "bounce-in" | "typewriter" | "slide-mask" | "fade-scale" | "word-stagger";
+  animation_style: "line-reveal" | "blur-in" | "scale-pop" | "word-stagger" | "fade-scale" | "slide-mask" | "bounce-in" | "typewriter";
   spring: {
     damping: number;
     mass: number;
@@ -59,151 +59,159 @@ interface SceneData {
   motion_config: MotionConfig;
 }
 
-// Spring presets for different animation feels
+// NEW: Fast cinematic spring presets
 const springPresets = {
+  instant: { damping: 30, mass: 0.3, stiffness: 400, overshootClamping: true },
+  crisp: { damping: 25, mass: 0.4, stiffness: 300, overshootClamping: true },
+  cinematic: { damping: 35, mass: 0.8, stiffness: 120, overshootClamping: true },
+  punch: { damping: 18, mass: 0.5, stiffness: 350, overshootClamping: false },
+  // Legacy presets
   bouncy: { damping: 12, mass: 1, stiffness: 100, overshootClamping: false },
   snappy: { damping: 20, mass: 0.5, stiffness: 200, overshootClamping: false },
   smooth: { damping: 30, mass: 1, stiffness: 80, overshootClamping: true },
-  gentle: { damping: 25, mass: 1.5, stiffness: 60, overshootClamping: false },
-  elastic: { damping: 8, mass: 0.8, stiffness: 150, overshootClamping: false },
 };
 
 // Generate cursor paths and zoom targets for demo-style scenes
-// Uses percentage-based coordinates for proper positioning across all viewport sizes
 const generateDemoEffects = (sceneType: string, sceneIndex: number, durationFrames: number): Partial<MotionConfig> => {
   const effects: Partial<MotionConfig> = {};
   
-  // Add cursor animation for MORE scene types (not just feature/reveal)
-  // Using percentage-based positions that translate to screen coordinates
-  if (["feature", "reveal", "benefit", "tension"].includes(sceneType)) {
-    // Generate varied cursor paths across the screen (20-80% range)
-    const baseX = 200 + (sceneIndex * 150) % 600; // 200-800px range on 1920 width
-    const baseY = 150 + (sceneIndex * 100) % 400; // 150-550px range on 1080 height
+  // Add cursor animation for workflow scenes
+  if (["workflow", "feature", "reveal", "how-it-works"].includes(sceneType)) {
+    const baseX = 200 + (sceneIndex * 150) % 600;
+    const baseY = 150 + (sceneIndex * 100) % 400;
     effects.cursor_path = {
       startX: baseX,
       startY: baseY,
-      endX: baseX + 300 + (sceneIndex * 80) % 200, // Move 300-500px right
-      endY: baseY + 200 + (sceneIndex * 60) % 150, // Move 200-350px down
-      clickFrame: Math.floor(durationFrames * 0.65),
+      endX: baseX + 300 + (sceneIndex * 80) % 200,
+      endY: baseY + 200 + (sceneIndex * 60) % 150,
+      clickFrame: Math.floor(durationFrames * 0.6),
     };
   }
   
-  // Add zoom spotlight targets to MORE scenes for dramatic focus effect
-  if (["tension", "climax", "feature", "reveal", "hook"].includes(sceneType)) {
+  // Add zoom spotlight targets for dramatic scenes
+  if (["pain-point", "solution", "result", "climax", "hook"].includes(sceneType)) {
     effects.zoom_targets = [{
-      x: 35 + (sceneIndex * 12) % 35, // 35-70% from left (centered area)
-      y: 30 + (sceneIndex * 10) % 30, // 30-60% from top
-      scale: 1.5 + (sceneIndex * 0.15) % 0.5, // 1.5-2.0x zoom
-      startFrame: Math.floor(durationFrames * 0.1),
-      endFrame: Math.floor(durationFrames * 0.75),
+      x: 40 + (sceneIndex * 10) % 30,
+      y: 35 + (sceneIndex * 8) % 25,
+      scale: 1.6 + (sceneIndex * 0.1) % 0.4,
+      startFrame: Math.floor(durationFrames * 0.08),
+      endFrame: Math.floor(durationFrames * 0.7),
     }];
   }
   
-  // Add UI highlight callouts to benefit, feature, AND reveal scenes
-  if (["benefit", "feature", "reveal"].includes(sceneType)) {
+  // Add UI highlight callouts for feature scenes
+  if (["feature", "workflow", "how-it-works"].includes(sceneType)) {
     effects.ui_highlights = [{
-      x: 250 + (sceneIndex * 130) % 550, // Spread across screen
+      x: 250 + (sceneIndex * 130) % 550,
       y: 150 + (sceneIndex * 90) % 350,
       width: 240,
       height: 70,
       label: sceneIndex % 2 === 0 ? "Key Feature" : undefined,
-      delay: 18,
-      duration: durationFrames - 35,
+      delay: 12,
+      duration: durationFrames - 25,
     }];
   }
   
   return effects;
 };
 
-// Map scene type to recommended animation style and effects
+// Map scene type to cinematic animation style and effects
 const getMotionConfigForSceneType = (sceneType: string, sceneIndex: number, totalScenes: number): MotionConfig => {
-  const isFirst = sceneIndex === 0;
-  const isLast = sceneIndex === totalScenes - 1;
-  
   switch (sceneType) {
-    case "hook":
-      // Hook scenes now get zoom targets for dramatic opening
+    case "pain-point":
       return {
-        animation_style: "bounce-in",
-        spring: springPresets.elastic,
-        stagger_delay_frames: 2,
-        entrance_delay_frames: 5,
-        effects: ["vignette", "glow", "particles"],
-      };
-    case "tension":
-      return {
-        animation_style: "slide-mask",
-        spring: springPresets.snappy,
+        animation_style: "blur-in",
+        spring: springPresets.cinematic,
         stagger_delay_frames: 1,
-        entrance_delay_frames: 8,
-        effects: ["vignette", "scanlines"],
+        entrance_delay_frames: 3,
+        effects: ["vignette"],
       };
-    case "reveal":
+    case "solution":
       return {
-        animation_style: "word-stagger",
-        spring: springPresets.bouncy,
-        stagger_delay_frames: 3,
-        entrance_delay_frames: 10,
-        effects: ["glow", "particles"],
+        animation_style: "scale-pop",
+        spring: springPresets.punch,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 4,
+        effects: ["glow", "vignette"],
+      };
+    case "hook":
+      return {
+        animation_style: "line-reveal",
+        spring: springPresets.crisp,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 3,
+        effects: ["vignette", "glow"],
+      };
+    case "workflow":
+    case "how-it-works":
+      return {
+        animation_style: "fade-scale",
+        spring: springPresets.instant,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 5,
+        effects: ["vignette"],
       };
     case "feature":
       return {
-        animation_style: "fade-scale",
-        spring: springPresets.smooth,
-        stagger_delay_frames: 2,
-        entrance_delay_frames: 12,
-        effects: ["vignette", "glow"],
+        animation_style: "line-reveal",
+        spring: springPresets.crisp,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 4,
+        effects: ["vignette"],
       };
-    case "benefit":
+    case "result":
       return {
-        animation_style: "bounce-in",
-        spring: springPresets.gentle,
-        stagger_delay_frames: 2,
-        entrance_delay_frames: 8,
-        effects: ["particles", "vignette"],
+        animation_style: "scale-pop",
+        spring: springPresets.punch,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 3,
+        effects: ["glow", "vignette"],
       };
     case "climax":
       return {
         animation_style: "word-stagger",
-        spring: springPresets.elastic,
+        spring: springPresets.punch,
         stagger_delay_frames: 2,
-        entrance_delay_frames: 5,
-        effects: ["vignette", "glow", "particles", "scanlines"],
+        entrance_delay_frames: 3,
+        effects: ["vignette", "glow"],
       };
     case "cta":
       return {
-        animation_style: "fade-scale",
-        spring: springPresets.bouncy,
-        stagger_delay_frames: 3,
-        entrance_delay_frames: 10,
+        animation_style: "scale-pop",
+        spring: springPresets.punch,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 4,
         effects: ["glow", "vignette"],
       };
     default:
       return {
-        animation_style: "bounce-in",
-        spring: springPresets.bouncy,
-        stagger_delay_frames: 2,
-        entrance_delay_frames: 10,
-        effects: ["vignette", "glow"],
+        animation_style: "line-reveal",
+        spring: springPresets.crisp,
+        stagger_delay_frames: 1,
+        entrance_delay_frames: 4,
+        effects: ["vignette"],
       };
   }
 };
 
-// Map scene type to transition
+// Map scene type to cinematic transition
 const getTransitionForSceneType = (sceneType: string, sceneIndex: number): string => {
-  if (sceneIndex === 0) return "fade"; // First scene always fades in
+  if (sceneIndex === 0) return "fade";
   
   switch (sceneType) {
+    case "pain-point":
+      return "cross-dissolve";
+    case "solution":
+      return "wipe";
     case "hook":
       return "zoom";
-    case "tension":
+    case "workflow":
+    case "how-it-works":
       return "slide-left";
-    case "reveal":
-      return "fade";
     case "feature":
       return "slide-right";
-    case "benefit":
-      return "slide-left";
+    case "result":
+      return "cross-dissolve";
     case "climax":
       return "zoom";
     case "cta":
@@ -226,89 +234,114 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // For single assets, we generate multiple scenes (5-7 based on duration)
+    // For single assets, generate 5-7 scenes based on duration
     const isSingleAsset = assetCount === 1;
     const targetSceneCount = isSingleAsset 
-      ? Math.max(5, Math.min(7, Math.floor(duration / 5)))
+      ? Math.max(5, Math.min(7, Math.floor(duration / 4)))
       : assetCount;
 
     const sceneDuration = Math.floor((duration * 1000) / targetSceneCount);
 
-    // Enhanced system prompt for Claude to generate motion-aware storyboards
-    const systemPrompt = `You are a world-class motion graphics director who creates viral Netflix-style product trailers with Framer-quality animations. Your trailers are:
+    // STORY-DRIVEN system prompt for Netflix-style trailers
+    const systemPrompt = `You are a world-class motion graphics director who creates viral Netflix-style product demo trailers. Your trailers follow a PROVEN narrative structure that keeps viewers hooked:
 
-- DRAMATIC: Every word hits like a punch. Short. Powerful. Unforgettable.
-- CINEMATIC: Think movie trailer, not corporate video. Build tension, then release.
-- EMOTIONAL: Connect with viewers' desires, fears, and aspirations.
-- RHYTHMIC: Perfect pacing that keeps viewers glued to the screen.
-- MOTION-AWARE: You think in terms of animations, timing, and visual flow.
+## NARRATIVE STRUCTURE (MANDATORY)
+Every trailer MUST follow this emotional arc:
 
-Your signature style:
-- Headlines are 2-5 words MAX. No fluff. Pure impact.
-- Use power words: Revolutionary, Unleash, Dominate, Transform, Unstoppable
-- Create a narrative arc: Hook → Build tension → Reveal → Call to action
-- Each scene should make viewers FEEL something
-- You consider how text will animate in (bounce, slide, typewriter, stagger)
-- You think about camera movement (Ken Burns zoom/pan for drama)
-${isSingleAsset ? `
-IMPORTANT: You are creating a multi-scene trailer from a SINGLE screenshot. 
-Each scene will show the same image with DIFFERENT:
-- Headlines and text overlays with varied animation styles
-- Zoom levels and pan directions (Ken Burns effect)
-- This creates a dynamic, cinematic feel from one static image` : ''}`;
+1. **PAIN POINT** (Scene 1): Open with the viewer's frustration. Make them FEEL the problem.
+   - Examples: "Drowning in spreadsheets?", "Another day, zero replies", "Tired of manual work?"
+   
+2. **SOLUTION INTRO** (Scene 2): The pivotal "change is possible" moment.
+   - Examples: "It's time to change.", "Meet [Product].", "There's a better way."
+   
+3. **HOW IT WORKS** (Scenes 3-5): Step-by-step feature walkthrough with action verbs.
+   - Examples: "Connect in seconds", "Automate everything", "See results instantly"
+   
+4. **RESULT/PROOF** (Scene 6): Show the transformation/outcome.
+   - Examples: "3x more conversions", "Hours saved every week", "Teams love it"
+   
+5. **CTA** (Final Scene): Urgent, compelling call to action.
+   - Examples: "Start free today", "Join 10,000+ teams", "Try it now"
+
+## YOUR SIGNATURE STYLE
+- Headlines are 2-5 words MAX. Pure impact.
+- Use power verbs: Crush, Launch, Dominate, Transform, Automate
+- Build TENSION then RELEASE
+- Think movie trailer, not corporate video
+- Every scene makes viewers FEEL something
+
+## MOTION AWARENESS
+You design for animation - each scene type gets specific treatment:
+- pain-point: Slow blur-in reveal (dark, tense mood)
+- solution: Quick scale-pop (eureka moment)
+- workflow/how-it-works: Clean line-reveal (clarity)
+- result: Dramatic scale-pop (celebration)
+- cta: Punchy scale-pop (urgency)`;
 
     const userPrompt = isSingleAsset 
-      ? `Create a ${duration}-second Netflix-style cinematic trailer from ONE product screenshot. Generate ${targetSceneCount} distinct scenes that will all use the same background image but with different headlines and camera movements.
+      ? `Create a ${duration}-second STORY-DRIVEN Netflix-style trailer from ONE product screenshot. Generate exactly ${targetSceneCount} scenes following this structure:
 
-TRAILER STRUCTURE (${targetSceneCount} scenes total):
-- Scene 1 (HOOK): Open with intrigue. Zoom in dramatically. Make them stop scrolling.
-- Scenes 2-${targetSceneCount - 1} (BUILD): Feature reveals with different zoom/pan combos. Each headline more powerful than the last.
-- Scene ${targetSceneCount} (CLIMAX/CTA): Pull back for full view. Epic call to action.
+SCENE STRUCTURE:
+- Scene 1 (PAIN-POINT): ${targetSceneCount > 5 ? "Start with viewer's frustration" : "Hook with a problem"}
+- Scene 2 (SOLUTION): "It's time to change" pivot moment
+- Scenes 3-${targetSceneCount - 2} (WORKFLOW): Feature demonstrations with action verbs
+- Scene ${targetSceneCount - 1} (RESULT): Show the transformation/benefit
+- Scene ${targetSceneCount} (CTA): Compelling call to action
 
-IMPORTANT: Each scene MUST have a DIFFERENT zoom_level and pan_direction to create visual variety from one image!
+CRITICAL: Use DIFFERENT zoom_level (1.0-1.8) and pan_direction for EACH scene!
 
 FOR EACH SCENE, provide:
-1. headline: 2-5 word power statement (ALL CAPS style energy)
-2. subtext: 6-12 word supporting line (optional, can be empty for pure visual impact)
-3. scene_type: "hook", "tension", "reveal", "feature", "benefit", "climax", or "cta"
-4. zoom_level: VARY between 1.0-1.5 (crucial for visual variety!)
+1. headline: 2-5 word power statement (action-oriented)
+2. subtext: 6-12 word supporting line (optional, "" for impact scenes)
+3. scene_type: "pain-point", "solution", "workflow", "feature", "result", or "cta"
+4. zoom_level: VARY 1.0-1.8 for dramatic effect
 5. pan_direction: VARY between "left", "right", "up", "down", "center"
 
-Return ONLY a valid JSON array with exactly ${targetSceneCount} objects.`
-      : `Create a ${duration}-second Netflix-style cinematic trailer storyboard for these ${assetCount} product screenshots.
+Return ONLY a valid JSON array.`
+      : `Create a ${duration}-second STORY-DRIVEN Netflix-style trailer for ${assetCount} product screenshots.
 
-TRAILER STRUCTURE:
-- Scene 1 (HOOK): Open with intrigue. Make them stop scrolling. Dark, mysterious, powerful.
-- Scenes 2-${assetCount - 1} (BUILD): Rapid-fire feature reveals with escalating intensity. Each scene more impressive than the last.
-- Scene ${assetCount} (CLIMAX/CTA): Epic finale with unforgettable call to action.
+NARRATIVE ARC:
+- Scene 1 (PAIN-POINT): Hook with viewer's frustration
+- Scene 2 (SOLUTION): Pivot to hope/solution
+- Scenes 3-${assetCount - 2} (WORKFLOW): Feature walkthroughs
+- Scene ${assetCount - 1} (RESULT): Show transformation
+- Scene ${assetCount} (CTA): Call to action
 
-FOR EACH SCENE, provide:
-1. headline: 2-5 word power statement (ALL CAPS style energy)
-2. subtext: 6-12 word supporting line (optional, can be empty for pure visual impact)
-3. scene_type: "hook", "tension", "reveal", "feature", "benefit", "climax", or "cta"
-4. zoom_level: VARY between 1.0-2.0 (dramatic zooms for visual impact!)
-5. pan_direction: VARY between "left", "right", "up", "down", "center" for dynamic camera movement
+FOR EACH SCENE:
+1. headline: 2-5 word power statement
+2. subtext: Supporting line (optional)
+3. scene_type: "pain-point", "solution", "workflow", "feature", "result", or "cta"
+4. zoom_level: 1.0-2.0
+5. pan_direction: "left", "right", "up", "down", or "center"
 
-Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
+Return ONLY a valid JSON array.`;
 
     const exampleJson = `[
   {
     "order_index": 0,
-    "headline": "THE GAME HAS CHANGED",
+    "headline": "STILL DOING THIS MANUALLY?",
     "subtext": "",
     "duration_ms": ${sceneDuration},
-    "scene_type": "hook",
-    "zoom_level": 1.3,
+    "scene_type": "pain-point",
+    "zoom_level": 1.4,
     "pan_direction": "center"
+  },
+  {
+    "order_index": 1,
+    "headline": "IT'S TIME TO CHANGE",
+    "subtext": "Meet the future of automation",
+    "duration_ms": ${sceneDuration},
+    "scene_type": "solution",
+    "zoom_level": 1.2,
+    "pan_direction": "left"
   }
 ]`;
 
-    const fullPrompt = userPrompt + "\n\nJSON Format Example:\n" + exampleJson;
+    const fullPrompt = userPrompt + "\n\nJSON Example:\n" + exampleJson;
 
     // Build content array with images for visual analysis
     const content: any[] = [{ type: "text", text: fullPrompt }];
 
-    // Add images to analyze (limit to 10)
     if (imageUrls && imageUrls.length > 0) {
       for (const url of imageUrls.slice(0, 10)) {
         if (url.match(/\.(jpg|jpeg|png|gif|webp)/i)) {
@@ -371,52 +404,40 @@ Return ONLY a valid JSON array with exactly ${assetCount} objects.`;
       console.error("Failed to parse AI response:", parseError);
     }
 
-    // Validate and ensure we have the right number of scenes
+    // Generate story-driven fallback scenes if AI fails
     if (!scenes || scenes.length !== targetSceneCount) {
-      console.log("Generating fallback Netflix-style scenes for", targetSceneCount, "scenes");
+      console.log("Generating story-driven fallback scenes for", targetSceneCount, "scenes");
       
-      const fallbackHeadlines = [
-        { headline: "THE FUTURE IS HERE", subtext: "", type: "hook", zoom: 1.3, pan: "center" },
-        { headline: "POWER UNLEASHED", subtext: "Built for those who demand more", type: "feature", zoom: 1.2, pan: "right" },
-        { headline: "BEYOND LIMITS", subtext: "Where innovation meets execution", type: "reveal", zoom: 1.15, pan: "left" },
-        { headline: "UNSTOPPABLE", subtext: "Nothing can hold you back", type: "benefit", zoom: 1.25, pan: "up" },
-        { headline: "DOMINATE", subtext: "Your competition won't know what hit them", type: "tension", zoom: 1.2, pan: "down" },
-        { headline: "REVOLUTIONARY", subtext: "This changes everything", type: "climax", zoom: 1.35, pan: "center" },
-        { headline: "START NOW", subtext: "The revolution begins today", type: "cta", zoom: 1.1, pan: "center" },
+      const storyScenes = [
+        { headline: "STILL DOING THIS MANUALLY?", subtext: "", type: "pain-point", zoom: 1.4, pan: "center" },
+        { headline: "IT'S TIME TO CHANGE", subtext: "Meet the smarter way to work", type: "solution", zoom: 1.2, pan: "left" },
+        { headline: "CONNECT IN SECONDS", subtext: "Simple setup, powerful results", type: "workflow", zoom: 1.3, pan: "right" },
+        { headline: "AUTOMATE EVERYTHING", subtext: "Let the platform do the heavy lifting", type: "workflow", zoom: 1.15, pan: "up" },
+        { headline: "SEE RESULTS INSTANTLY", subtext: "Real-time insights at your fingertips", type: "feature", zoom: 1.25, pan: "down" },
+        { headline: "3X FASTER RESULTS", subtext: "Teams report 3x productivity gains", type: "result", zoom: 1.35, pan: "center" },
+        { headline: "START FREE TODAY", subtext: "Join thousands of happy teams", type: "cta", zoom: 1.0, pan: "center" },
       ];
 
       scenes = Array.from({ length: targetSceneCount }, (_, i) => {
-        const fallback = fallbackHeadlines[i % fallbackHeadlines.length];
+        const sceneIndex = Math.min(i, storyScenes.length - 1);
+        // For first and last scenes, always use pain-point and cta
+        let story;
         if (i === 0) {
-          return {
-            order_index: i,
-            headline: "THE FUTURE IS HERE",
-            subtext: "",
-            duration_ms: sceneDuration,
-            scene_type: "hook",
-            zoom_level: 1.4,
-            pan_direction: "center",
-          };
+          story = storyScenes[0];
+        } else if (i === targetSceneCount - 1) {
+          story = storyScenes[storyScenes.length - 1];
+        } else {
+          story = storyScenes[Math.min(i, storyScenes.length - 2)];
         }
-        if (i === targetSceneCount - 1) {
-          return {
-            order_index: i,
-            headline: "START NOW",
-            subtext: "Join the revolution today",
-            duration_ms: sceneDuration,
-            scene_type: "cta",
-            zoom_level: 1.0,
-            pan_direction: "center",
-          };
-        }
+        
         return {
           order_index: i,
-          headline: fallback.headline,
-          subtext: fallback.subtext,
+          headline: story.headline,
+          subtext: story.subtext,
           duration_ms: sceneDuration,
-          scene_type: fallback.type,
-          zoom_level: fallback.zoom,
-          pan_direction: fallback.pan,
+          scene_type: story.type,
+          zoom_level: story.zoom,
+          pan_direction: story.pan,
         };
       });
     }

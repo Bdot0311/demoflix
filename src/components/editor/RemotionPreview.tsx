@@ -86,16 +86,16 @@ const convertToRemotionScene = (
   const asset = scene.asset || fallbackAsset;
   const storedConfig = scene.motion_config;
   
-  // Build motion config from stored data or use defaults
+  // Build motion config from stored data or use optimized defaults
   const motionConfig = storedConfig ? {
-    animation_style: (storedConfig.animation_style || "bounce-in") as any,
-    spring: storedConfig.spring || springPresets.bouncy,
-    stagger_delay_frames: storedConfig.stagger_delay_frames || 2,
-    entrance_delay_frames: storedConfig.entrance_delay_frames || 10,
-    effects: (storedConfig.effects || ["vignette", "glow", "particles"]) as any,
+    animation_style: (storedConfig.animation_style || "line-reveal") as any,
+    spring: storedConfig.spring || springPresets.crisp,
+    stagger_delay_frames: storedConfig.stagger_delay_frames || 1,
+    entrance_delay_frames: storedConfig.entrance_delay_frames || 4,
+    effects: (storedConfig.effects || ["vignette"]) as any,
     camera: {
       zoom_start: 1.0,
-      zoom_end: scene.zoom_level || 1.15,
+      zoom_end: scene.zoom_level || 1.2,
       pan_x: scene.pan_x || 0,
       pan_y: scene.pan_y || 0,
     },
@@ -105,12 +105,12 @@ const convertToRemotionScene = (
     ui_highlights: storedConfig.ui_highlights,
   } : {
     ...defaultMotionConfig,
-    animation_style: "bounce-in" as const,
-    spring: springPresets.bouncy,
-    effects: ["vignette", "glow", "particles"] as any,
+    animation_style: "line-reveal" as const,
+    spring: springPresets.crisp,
+    effects: ["vignette"] as any,
     camera: {
       zoom_start: 1.0,
-      zoom_end: scene.zoom_level || 1.15,
+      zoom_end: scene.zoom_level || 1.2,
       pan_x: scene.pan_x || 0,
       pan_y: scene.pan_y || 0,
     },
@@ -133,11 +133,13 @@ const mapTransition = (transition?: string): SceneData["transition"] => {
     case "slide-right":
     case "zoom":
     case "fade":
+    case "cross-dissolve":
+    case "wipe":
       return transition;
     case "slide-up":
     case "slide-down":
     case "dissolve":
-      return "fade";
+      return "cross-dissolve"; // Map to new cross-dissolve
     case "zoom-in":
     case "zoom-out":
     case "cross-zoom":
