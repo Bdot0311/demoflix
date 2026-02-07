@@ -85,8 +85,8 @@ interface StatData {
   label: string;
 }
 
-// Helper to fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 15000): Promise<Response> {
+// Helper to fetch with timeout - extended for Firecrawl which can be slow
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 60000): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   
@@ -97,6 +97,45 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
+  }
+}
+
+// Simpler scrape for fallback (just screenshot + basic content)
+async function scrapePageSimple(apiKey: string, pageUrl: string): Promise<{
+  screenshot?: string;
+  markdown?: string;
+  metadata?: any;
+  links?: string[];
+} | null> {
+  try {
+    console.log('Attempting simple scrape for:', pageUrl);
+    const response = await fetchWithTimeout(
+      'https://api.firecrawl.dev/v1/scrape',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: pageUrl,
+          formats: ['screenshot', 'markdown', 'links'],
+          waitFor: 3000,
+        }),
+      },
+      45000
+    );
+
+    if (!response.ok) {
+      console.error(`Simple scrape failed for ${pageUrl}: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.data || data;
+  } catch (error) {
+    console.error(`Error in simple scrape ${pageUrl}:`, error);
+    return null;
   }
 }
 
@@ -215,7 +254,7 @@ async function scrapePage(apiKey: string, pageUrl: string, isMainPage: boolean =
           waitFor: isMainPage ? 5000 : 3000,
         }),
       },
-      isMainPage ? 30000 : 20000 // Longer timeout for main page
+      isMainPage ? 55000 : 30000 // Extended timeout - Firecrawl extraction is slow
     );
 
     if (!response.ok) {
@@ -315,11 +354,17 @@ Deno.serve(async (req) => {
 
     // Step 2: Scrape main page with FULL content extraction
     console.log('Step 2: Scraping main page with full content extraction...');
-    const mainData = await scrapePage(apiKey, formattedUrl, true);
+    let mainData = await scrapePage(apiKey, formattedUrl, true);
+    
+    // Fallback to simple scrape if full extraction fails
+    if (!mainData) {
+      console.log('Full extraction failed, trying simple scrape...');
+      mainData = await scrapePageSimple(apiKey, formattedUrl);
+    }
     
     if (!mainData) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to scrape main page' }),
+        JSON.stringify({ success: false, error: 'Failed to scrape main page - website may be blocking requests or taking too long to load' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
