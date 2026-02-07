@@ -43,6 +43,12 @@ import {
   ChevronDown,
   Plus,
   Trash2,
+  PanelLeft,
+  PanelRight,
+  Menu,
+  X,
+  Layers,
+  Settings,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,6 +58,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import demoflixEmblem from "@/assets/demoflix-emblem.png";
 import { TransitionSelector, TransitionType } from "@/components/editor/TransitionSelector";
 import { KeyboardShortcutsModal } from "@/components/editor/KeyboardShortcutsModal";
@@ -59,6 +72,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { usePlayback } from "@/hooks/usePlayback";
 import { useHistory } from "@/hooks/useHistory";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { SortableScene } from "@/components/editor/SortableScene";
 import { PreviewPlayer } from "@/components/editor/PreviewPlayer";
 import { RemotionPreview } from "@/components/editor/RemotionPreview";
@@ -208,6 +222,9 @@ const Editor = () => {
   const [musicTracks, setMusicTracks] = useState<MusicTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
   
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -962,71 +979,240 @@ const Editor = () => {
     );
   }
 
+  // Scene List Content - reusable for both desktop sidebar and mobile sheet
+  const SceneListContent = () => (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+          Scenes
+        </h3>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleAddScene}
+          className="h-7 px-2 text-xs"
+        >
+          <Plus className="w-3 h-3 mr-1" />
+          Add
+        </Button>
+      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={scenes.map((s) => s.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-2">
+            {scenes.map((scene, index) => (
+              <SortableScene
+                key={scene.id}
+                scene={scene}
+                index={index}
+                isSelected={selectedScene === scene.id}
+                onSelect={() => {
+                  setSelectedScene(scene.id);
+                  if (isMobile) setLeftSidebarOpen(false);
+                }}
+                onDelete={() => handleDeleteScene(scene.id)}
+                canDelete={scenes.length > 1}
+              />
+            ))}
+          </div>
+        </SortableContext>
+        <DragOverlay>
+          {activeScene && (
+            <div className="p-3 rounded-xl bg-primary/30 border border-primary shadow-lg backdrop-blur-sm">
+              <div className="text-sm font-medium text-foreground truncate">
+                {activeScene.headline || "Scene"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {(activeScene.duration_ms / 1000).toFixed(1)}s
+              </div>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+    </>
+  );
+
+  // Properties Panel Content - reusable for both desktop sidebar and mobile sheet
+  const PropertiesPanelContent = () => (
+    <>
+      {selectedSceneData ? (
+        <div className="space-y-6">
+          {/* Text Controls */}
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+              <Type className="w-4 h-4" />
+              Text
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Headline</label>
+                <Input
+                  value={selectedSceneData.headline || ""}
+                  onChange={(e) => updateScene(selectedSceneData.id, { headline: e.target.value })}
+                  placeholder="Enter headline..."
+                  className="bg-input border-border"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Subtext</label>
+                <Input
+                  value={selectedSceneData.subtext || ""}
+                  onChange={(e) => updateScene(selectedSceneData.id, { subtext: e.target.value })}
+                  placeholder="Enter subtext..."
+                  className="bg-input border-border"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Transition */}
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+              <Shuffle className="w-4 h-4" />
+              Transition
+            </h3>
+            <TransitionSelector
+              value={(selectedSceneData.transition as TransitionType) || "fade"}
+              onChange={(value) => updateScene(selectedSceneData.id, { transition: value })}
+            />
+          </div>
+
+          {/* Timing */}
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Duration
+            </h3>
+            <div className="space-y-3">
+              <Slider
+                value={[selectedSceneData.duration_ms]}
+                onValueChange={(value) => updateScene(selectedSceneData.id, { duration_ms: value[0] })}
+                min={1000}
+                max={15000}
+                step={500}
+                className="w-full"
+              />
+              <div className="text-sm text-muted-foreground text-center">
+                {(selectedSceneData.duration_ms / 1000).toFixed(1)} seconds
+              </div>
+            </div>
+          </div>
+
+          {/* Music Selector */}
+          <MusicSelector
+            tracks={musicTracks}
+            selectedTrackId={selectedTrack}
+            onSelectTrack={handleSelectTrack}
+            recommendations={musicRecommendations}
+            storyboardMood={storyboardMood}
+            isRecommending={isRecommendingMusic}
+            onRecommend={handleRecommendMusic}
+            volume={musicVolume}
+            onVolumeChange={handleVolumeChange}
+            disabled={scenes.length === 0}
+          />
+
+          {/* Branding */}
+          {project && (
+            <BrandingPanel
+              projectId={project.id}
+              settings={{
+                logo_url: project.logo_url,
+                brand_color: project.brand_color || "#E50914",
+                brand_color_secondary: project.brand_color_secondary || "#141414",
+                logo_position: (project.logo_position as any) || "bottom-right",
+                logo_size: (project.logo_size as any) || "medium",
+                show_logo_on_all_scenes: project.show_logo_on_all_scenes || false,
+              }}
+              onUpdate={handleBrandingUpdate}
+              disabled={scenes.length === 0}
+            />
+          )}
+
+          {/* Voiceover Panel */}
+          {project && (
+            <VoiceoverPanel
+              projectId={project.id}
+              projectStyle={project.style}
+              scenes={scenes}
+              voiceoverUrl={voiceoverUrl}
+              voiceoverEnabled={voiceoverEnabled}
+              onVoiceoverGenerated={setVoiceoverUrl}
+              onVoiceoverRemoved={() => setVoiceoverUrl(null)}
+              onVoiceoverToggle={setVoiceoverEnabled}
+              disabled={scenes.length === 0}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="text-center text-muted-foreground py-12">
+          <p>Select a scene to edit</p>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top Navigation */}
       <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Mobile sidebar toggles */}
+            {isMobile && (
+              <Sheet open={leftSidebarOpen} onOpenChange={setLeftSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Layers className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-4">
+                  <SheetHeader>
+                    <SheetTitle>Scenes</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    <SceneListContent />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+            
             <Link to="/dashboard">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div className="flex items-center gap-3">
-              <img src={demoflixEmblem} alt="DemoFlix" className="h-8 w-auto" />
-              <span className="text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="font-medium text-foreground">{project?.name}</span>
+            <div className="flex items-center gap-2 md:gap-3">
+              <img src={demoflixEmblem} alt="DemoFlix" className="h-6 md:h-8 w-auto" />
+              <span className="hidden sm:inline text-lg font-bold tracking-tight text-foreground">DemoFlix</span>
+              <span className="hidden md:inline text-muted-foreground">/</span>
+              <span className="hidden md:inline font-medium text-foreground truncate max-w-32 lg:max-w-none">{project?.name}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          
+          {/* Desktop actions */}
+          <div className="hidden lg:flex items-center gap-2">
             <ThemeToggle />
-            {/* Undo/Redo */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={undo}
-              disabled={!canUndo}
-              title="Undo (Ctrl+Z)"
-            >
+            <Button variant="ghost" size="icon" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">
               <Undo2 className="w-4 h-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={redo}
-              disabled={!canRedo}
-              title="Redo (Ctrl+Shift+Z)"
-            >
+            <Button variant="ghost" size="icon" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)">
               <Redo2 className="w-4 h-4" />
             </Button>
-            
             <div className="w-px h-6 bg-border mx-1" />
-            
-            {/* Keyboard Shortcuts */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowShortcutsModal(true)}
-              title="Keyboard Shortcuts (?)"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setShowShortcutsModal(true)} title="Keyboard Shortcuts (?)">
               <Keyboard className="w-4 h-4" />
             </Button>
-            
             <div className="w-px h-6 bg-border mx-1" />
-            
-            <Button 
-              variant="outline" 
-              onClick={handleAIGenerate} 
-              disabled={isGeneratingAI || assets.length === 0}
-              className="border-border"
-            >
-              {isGeneratingAI ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4 mr-2" />
-              )}
+            <Button variant="outline" onClick={handleAIGenerate} disabled={isGeneratingAI || assets.length === 0} className="border-border">
+              {isGeneratingAI ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
               {isGeneratingAI ? "Generating..." : "AI Generate"}
             </Button>
             <Button variant="outline" onClick={handleSave} disabled={isSaving} className="border-border">
@@ -1035,11 +1221,7 @@ const Editor = () => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="border-border"
-                  disabled={!latestRender?.video_url}
-                >
+                <Button variant="outline" className="border-border" disabled={!latestRender?.video_url}>
                   <Download className="w-4 h-4 mr-2" />
                   Export MP4
                   <ChevronDown className="w-4 h-4 ml-2" />
@@ -1048,11 +1230,7 @@ const Editor = () => {
               <DropdownMenuContent align="end" className="w-56 bg-card border-border z-50">
                 <DropdownMenuLabel>Standard Formats</DropdownMenuLabel>
                 {exportFormats.map((format) => (
-                  <DropdownMenuItem
-                    key={format.id}
-                    onClick={() => handleExportVideo(format)}
-                    className="cursor-pointer"
-                  >
+                  <DropdownMenuItem key={format.id} onClick={() => handleExportVideo(format)} className="cursor-pointer">
                     {format.icon}
                     <span className="ml-2">{format.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground">{format.aspect}</span>
@@ -1061,11 +1239,7 @@ const Editor = () => {
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Social Platforms</DropdownMenuLabel>
                 {socialFormats.map((format) => (
-                  <DropdownMenuItem
-                    key={format.id}
-                    onClick={() => handleExportVideo(format)}
-                    className="cursor-pointer"
-                  >
+                  <DropdownMenuItem key={format.id} onClick={() => handleExportVideo(format)} className="cursor-pointer">
                     {format.icon}
                     <span className="ml-2">{format.name}</span>
                     <span className="ml-auto text-xs text-muted-foreground">{format.aspect}</span>
@@ -1078,6 +1252,36 @@ const Editor = () => {
               Generate Trailer
             </Button>
           </div>
+
+          {/* Mobile/Tablet actions */}
+          <div className="flex lg:hidden items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={handleSave} disabled={isSaving}>
+              <Save className="w-4 h-4" />
+            </Button>
+            <Button size="sm" onClick={handleGenerate} className="bg-primary hover:bg-primary/90">
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">Generate</span>
+            </Button>
+            
+            {/* Mobile properties toggle */}
+            {isMobile && (
+              <Sheet open={rightSidebarOpen} onOpenChange={setRightSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Settings className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-80 p-4 overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Properties</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4">
+                    <PropertiesPanelContent />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -1088,65 +1292,17 @@ const Editor = () => {
       />
 
       <div className="flex-1 flex">
-        {/* Left Sidebar - Scene List */}
-        <div className="w-72 border-r border-border/50 bg-card/30 p-4 overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Scenes
-            </h3>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleAddScene}
-              className="h-7 px-2 text-xs"
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add
-            </Button>
+        {/* Left Sidebar - Scene List (Desktop only) */}
+        {!isMobile && (
+          <div className="w-72 border-r border-border/50 bg-card/30 p-4 overflow-y-auto hidden md:block">
+            <SceneListContent />
           </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={scenes.map((s) => s.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {scenes.map((scene, index) => (
-                  <SortableScene
-                    key={scene.id}
-                    scene={scene}
-                    index={index}
-                    isSelected={selectedScene === scene.id}
-                    onSelect={() => setSelectedScene(scene.id)}
-                    onDelete={() => handleDeleteScene(scene.id)}
-                    canDelete={scenes.length > 1}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-            <DragOverlay>
-              {activeScene && (
-                <div className="p-3 rounded-xl bg-primary/30 border border-primary shadow-lg backdrop-blur-sm">
-                  <div className="text-sm font-medium text-foreground truncate">
-                    {activeScene.headline || "Scene"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {(activeScene.duration_ms / 1000).toFixed(1)}s
-                  </div>
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        </div>
+        )}
 
         {/* Main Preview Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           {/* Preview */}
-          <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
+          <div className="flex-1 flex flex-col items-center justify-center p-2 md:p-8 overflow-hidden">
             {/* Preview Toggle */}
             <div className="flex items-center gap-2 mb-4">
               <button
@@ -1237,123 +1393,12 @@ const Editor = () => {
           />
         </div>
 
-        {/* Right Sidebar - Properties */}
-        <div className="w-80 border-l border-border/50 bg-card/30 p-4 overflow-y-auto">
-          {selectedSceneData ? (
-            <div className="space-y-6">
-              {/* Text Controls */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Type className="w-4 h-4" />
-                  Text
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Headline</label>
-                    <Input
-                      value={selectedSceneData.headline || ""}
-                      onChange={(e) => updateScene(selectedSceneData.id, { headline: e.target.value })}
-                      placeholder="Enter headline..."
-                      className="bg-input border-border"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Subtext</label>
-                    <Input
-                      value={selectedSceneData.subtext || ""}
-                      onChange={(e) => updateScene(selectedSceneData.id, { subtext: e.target.value })}
-                      placeholder="Enter subtext..."
-                      className="bg-input border-border"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Transition */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Shuffle className="w-4 h-4" />
-                  Transition
-                </h3>
-                <TransitionSelector
-                  value={(selectedSceneData.transition as TransitionType) || "fade"}
-                  onChange={(value) => updateScene(selectedSceneData.id, { transition: value })}
-                />
-              </div>
-
-              {/* Timing */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Duration
-                </h3>
-                <div className="space-y-3">
-                  <Slider
-                    value={[selectedSceneData.duration_ms]}
-                    onValueChange={(value) => updateScene(selectedSceneData.id, { duration_ms: value[0] })}
-                    min={1000}
-                    max={15000}
-                    step={500}
-                    className="w-full"
-                  />
-                  <div className="text-sm text-muted-foreground text-center">
-                    {(selectedSceneData.duration_ms / 1000).toFixed(1)} seconds
-                  </div>
-                </div>
-              </div>
-
-              {/* Music Selector */}
-              <MusicSelector
-                tracks={musicTracks}
-                selectedTrackId={selectedTrack}
-                onSelectTrack={handleSelectTrack}
-                recommendations={musicRecommendations}
-                storyboardMood={storyboardMood}
-                isRecommending={isRecommendingMusic}
-                onRecommend={handleRecommendMusic}
-                volume={musicVolume}
-                onVolumeChange={handleVolumeChange}
-                disabled={scenes.length === 0}
-              />
-
-              {/* Branding */}
-              {project && (
-                <BrandingPanel
-                  projectId={project.id}
-                  settings={{
-                    logo_url: project.logo_url,
-                    brand_color: project.brand_color || "#E50914",
-                    brand_color_secondary: project.brand_color_secondary || "#141414",
-                    logo_position: (project.logo_position as any) || "bottom-right",
-                    logo_size: (project.logo_size as any) || "medium",
-                    show_logo_on_all_scenes: project.show_logo_on_all_scenes || false,
-                  }}
-                  onUpdate={handleBrandingUpdate}
-                  disabled={scenes.length === 0}
-                />
-              )}
-
-              {/* Voiceover Panel */}
-              {project && (
-                <VoiceoverPanel
-                  projectId={project.id}
-                  projectStyle={project.style}
-                  scenes={scenes}
-                  voiceoverUrl={voiceoverUrl}
-                  voiceoverEnabled={voiceoverEnabled}
-                  onVoiceoverGenerated={setVoiceoverUrl}
-                  onVoiceoverRemoved={() => setVoiceoverUrl(null)}
-                  onVoiceoverToggle={setVoiceoverEnabled}
-                  disabled={scenes.length === 0}
-                />
-              )}
-            </div>
-          ) : (
-            <div className="text-center text-muted-foreground py-12">
-              <p>Select a scene to edit</p>
-            </div>
-          )}
-        </div>
+        {/* Right Sidebar - Properties (Desktop only) */}
+        {!isMobile && (
+          <div className="w-80 border-l border-border/50 bg-card/30 p-4 overflow-y-auto hidden md:block">
+            <PropertiesPanelContent />
+          </div>
+        )}
       </div>
     </div>
   );

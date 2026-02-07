@@ -9,20 +9,20 @@ const LandingPage = () => {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={demoflixEmblem} alt="DemoFlix" className="h-10 w-auto" />
-            <span className="text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
+            <img src={demoflixEmblem} alt="DemoFlix" className="h-8 md:h-10 w-auto" />
+            <span className="text-lg md:text-xl font-bold tracking-tight text-foreground">DemoFlix</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <ThemeToggle />
-            <Link to="/login">
+            <Link to="/login" className="hidden sm:block">
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 Log in
               </Button>
             </Link>
             <Link to="/signup">
-              <Button className="bg-primary hover:bg-primary/90 glow-sm">
+              <Button className="bg-primary hover:bg-primary/90 glow-sm text-sm md:text-base px-3 md:px-4">
                 Get Started
               </Button>
             </Link>
@@ -47,12 +47,12 @@ const LandingPage = () => {
               <span className="text-sm text-muted-foreground">AI-Powered Video Generation</span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-6 leading-tight">
               Turn Screenshots Into{" "}
               <span className="text-gradient">Cinematic Trailers</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl md:text-2xl text-muted-foreground mb-8 md:mb-10 max-w-2xl mx-auto px-4">
               Transform boring SaaS screenshots and screen recordings into Netflix-style product demo trailers. No editing skills required.
             </p>
             
