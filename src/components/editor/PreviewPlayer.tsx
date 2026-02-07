@@ -306,14 +306,28 @@ export const PreviewPlayer = ({
     };
   }, [musicUrl]);
 
-  // Handle fullscreen changes
+  // Handle fullscreen changes with cross-browser support
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFS = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFS);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
   }, []);
 
   // Keyboard controls for fullscreen
@@ -341,17 +355,81 @@ export const PreviewPlayer = ({
 
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
+    
+    const elem = containerRef.current as any;
+    const doc = document as any;
 
     try {
-      if (!document.fullscreenElement) {
-        await containerRef.current.requestFullscreen();
+      const isFS = !!(
+        document.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement
+      );
+      
+      if (!isFS) {
+        // Enter fullscreen with cross-browser support
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          await elem.mozRequestFullScreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        } else {
+          // Fallback for unsupported browsers - use CSS fullscreen
+          elem.style.position = 'fixed';
+          elem.style.top = '0';
+          elem.style.left = '0';
+          elem.style.width = '100vw';
+          elem.style.height = '100vh';
+          elem.style.zIndex = '9999';
+          setIsFullscreen(true);
+        }
       } else {
-        await document.exitFullscreen();
+        // Exit fullscreen with cross-browser support
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen();
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen();
+        } else {
+          // Fallback - reset CSS
+          elem.style.position = '';
+          elem.style.top = '';
+          elem.style.left = '';
+          elem.style.width = '';
+          elem.style.height = '';
+          elem.style.zIndex = '';
+          setIsFullscreen(false);
+        }
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
+      // CSS fallback on error
+      if (!isFullscreen) {
+        elem.style.position = 'fixed';
+        elem.style.top = '0';
+        elem.style.left = '0';
+        elem.style.width = '100vw';
+        elem.style.height = '100vh';
+        elem.style.zIndex = '9999';
+        setIsFullscreen(true);
+      } else {
+        elem.style.position = '';
+        elem.style.top = '';
+        elem.style.left = '';
+        elem.style.width = '';
+        elem.style.height = '';
+        elem.style.zIndex = '';
+        setIsFullscreen(false);
+      }
     }
-  }, []);
+  }, [isFullscreen]);
 
   // Handle scene transitions
   useEffect(() => {

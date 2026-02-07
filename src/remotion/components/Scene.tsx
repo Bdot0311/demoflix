@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useMemo } from "react";
 import {
   useCurrentFrame,
   useVideoConfig,
@@ -125,7 +125,8 @@ const ZoomSpotlight: React.FC<{
   );
 };
 
-export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
+// Memoize the Scene component to prevent unnecessary re-renders
+export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
 
@@ -138,8 +139,10 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
     transition,
   } = scene;
 
-  // Ken Burns camera movement
-  const kenBurns = getKenBurnsTransform(frame, sceneDuration, motionConfig.camera);
+  // Memoize Ken Burns camera movement calculation
+  const kenBurns = useMemo(() => 
+    getKenBurnsTransform(frame, sceneDuration, motionConfig.camera),
+  [frame, sceneDuration, motionConfig.camera]);
 
   // Transition effects
   const transitionDuration = 15; // frames
@@ -196,11 +199,15 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
 
   const transitionStyle = getTransitionStyle();
 
-  // Check which effects are enabled
-  const hasParticles = motionConfig.effects.includes("particles");
-  const hasVignette = motionConfig.effects.includes("vignette");
-  const hasGlow = motionConfig.effects.includes("glow");
-  const hasScanlines = motionConfig.effects.includes("scanlines");
+  // Memoize effect flags to avoid recalculation
+  const effectFlags = useMemo(() => ({
+    hasParticles: motionConfig.effects.includes("particles"),
+    hasVignette: motionConfig.effects.includes("vignette"),
+    hasGlow: motionConfig.effects.includes("glow"),
+    hasScanlines: motionConfig.effects.includes("scanlines"),
+  }), [motionConfig.effects]);
+
+  const { hasParticles, hasVignette, hasGlow, hasScanlines } = effectFlags;
 
   return (
     <AbsoluteFill style={transitionStyle}>
@@ -311,4 +318,4 @@ export const Scene: React.FC<SceneProps> = ({ scene, isFirst, isLast }) => {
       </AbsoluteFill>
     </AbsoluteFill>
   );
-};
+});
