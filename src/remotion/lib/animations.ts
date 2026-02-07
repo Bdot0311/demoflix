@@ -60,14 +60,15 @@ export const uiHighlightSchema = z.object({
   duration: z.number(),
 });
 
-// SIMPLIFIED: Only 3 core animation styles
+// CINEMATIC: Animation styles with cursor, highlights, and zoom targets
 export const motionConfigSchema = z.object({
   animation_style: z.enum(["fade-scale", "slide", "zoom"]),
   spring: springConfigSchema,
   stagger_delay_frames: z.number(),
   entrance_delay_frames: z.number(),
-  effects: z.array(z.enum(["vignette"])), // Only vignette for performance
+  effects: z.array(z.enum(["vignette"])),
   camera: cameraConfigSchema,
+  // CINEMATIC features
   cursor_path: cursorPathSchema.optional(),
   zoom_targets: z.array(zoomTargetSchema).optional(),
   ui_highlights: z.array(uiHighlightSchema).optional(),
@@ -80,7 +81,7 @@ export const sceneDataSchema = z.object({
   imageUrl: z.string(),
   durationInFrames: z.number(),
   motionConfig: motionConfigSchema,
-  transition: z.enum(["fade", "slide", "zoom"]), // Only 3 transitions
+  transition: z.enum(["fade", "slide", "zoom"]),
 });
 
 export const trailerPropsSchema = z.object({

@@ -420,35 +420,80 @@ Deno.serve(async (req) => {
       result.videos!.push(...extractedData.demoVideos);
     }
 
-    // Parse HTML/markdown for embedded videos (YouTube, Vimeo, Loom, etc.)
+    // Parse HTML/markdown for embedded videos (YouTube, Vimeo, Loom, Wistia, Vidyard, etc.)
     const html = mainData.html || '';
+    const markdown = mainData.markdown || '';
+    const combinedContent = html + ' ' + markdown;
     
-    // Extract video URLs from HTML
+    // ENHANCED video extraction patterns
     const videoPatterns = [
-      // YouTube
-      /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/gi,
-      // Vimeo
-      /(?:vimeo\.com\/|player\.vimeo\.com\/video\/)(\d+)/gi,
-      // Loom
-      /(?:loom\.com\/share\/|loom\.com\/embed\/)([a-zA-Z0-9]+)/gi,
-      // Wistia
-      /(?:wistia\.com\/medias\/|wistia\.net\/embed\/iframe\/)([a-zA-Z0-9]+)/gi,
+      // YouTube (all formats including shorts)
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/gi,
+      // Vimeo (all formats)
+      /(?:player\.vimeo\.com\/video\/|vimeo\.com\/)(\d+)/gi,
+      // Loom (extended - share, embed, useloom)
+      /(?:loom\.com\/share\/|loom\.com\/embed\/|useloom\.com\/share\/)([a-zA-Z0-9]+)/gi,
+      // Wistia (all embed formats)
+      /(?:wistia\.com\/medias\/|wistia\.net\/embed\/|fast\.wistia\.net\/embed\/iframe\/)([a-zA-Z0-9]+)/gi,
+      // Vidyard
+      /(?:vidyard\.com\/watch\/|video\.vidyard\.com\/watch\/)([a-zA-Z0-9]+)/gi,
+      // Cloudinary video
+      /(?:cloudinary\.com\/[^/]+\/video\/upload\/[^"'\s]+)/gi,
       // Direct video files
-      /(https?:\/\/[^\s"']+\.(?:mp4|webm|mov|avi|m4v))/gi,
+      /(https?:\/\/[^\s"'<>]+\.(?:mp4|webm|mov|avi|m4v|ogg))/gi,
     ];
     
-    for (const pattern of videoPatterns) {
+    // Also extract from iframe src attributes
+    const iframeSrcPattern = /src=["']([^"']*(?:youtube|vimeo|loom|wistia|vidyard)[^"']*)["']/gi;
+    
+    // Collect all video URLs
+    const allVideoUrls: string[] = [];
+    
+    for (const pattern of [...videoPatterns, iframeSrcPattern]) {
       let match;
-      while ((match = pattern.exec(html)) !== null) {
-        const videoUrl = match[0];
-        if (!result.videos!.includes(videoUrl)) {
+      // Reset pattern for each iteration
+      pattern.lastIndex = 0;
+      while ((match = pattern.exec(combinedContent)) !== null) {
+        let videoUrl = match[0];
+        
+        // Clean up the URL
+        if (videoUrl.startsWith('src=')) {
+          videoUrl = match[1]; // Get just the URL from src attribute
+        }
+        
+        // Normalize YouTube URLs
+        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+          const videoId = videoUrl.match(/([a-zA-Z0-9_-]{11})/)?.[1];
+          if (videoId) {
+            videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          }
+        }
+        
+        // Normalize Vimeo URLs
+        if (videoUrl.includes('vimeo.com')) {
+          const videoId = videoUrl.match(/(\d+)/)?.[1];
+          if (videoId) {
+            videoUrl = `https://vimeo.com/${videoId}`;
+          }
+        }
+        
+        // Add to results if not already present
+        if (!allVideoUrls.includes(videoUrl) && !result.videos!.includes(videoUrl)) {
+          allVideoUrls.push(videoUrl);
           result.videos!.push(videoUrl);
-          if (videoUrl.includes('demo') || videoUrl.includes('walkthrough') || videoUrl.includes('tutorial')) {
+          
+          // Identify demo videos
+          const lowerUrl = videoUrl.toLowerCase();
+          if (lowerUrl.includes('demo') || lowerUrl.includes('walkthrough') || 
+              lowerUrl.includes('tutorial') || lowerUrl.includes('tour') ||
+              lowerUrl.includes('overview') || lowerUrl.includes('intro')) {
             result.content!.demoVideos.push(videoUrl);
           }
         }
       }
     }
+    
+    console.log(`Extracted ${allVideoUrls.length} video URLs from page content`);
 
     // Add main page to pages list with full content
     result.pages!.push({

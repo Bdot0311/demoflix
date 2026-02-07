@@ -105,6 +105,7 @@ const convertToRemotionScene = (
 ): SceneData => {
   const asset = scene.asset || fallbackAsset;
   const storedConfig = scene.motion_config;
+  const sceneFrames = Math.round((scene.duration_ms / 1000) * FPS);
   
   // Build simplified motion config for performance
   const motionConfig = {
@@ -119,6 +120,10 @@ const convertToRemotionScene = (
       pan_x: scene.pan_x || 0,
       pan_y: scene.pan_y || 0,
     },
+    // Pass through cinematic features from motion_config
+    cursor_path: storedConfig?.cursor_path,
+    ui_highlights: storedConfig?.ui_highlights,
+    zoom_targets: storedConfig?.zoom_targets,
   };
   
   return {
@@ -126,7 +131,7 @@ const convertToRemotionScene = (
     headline: scene.headline || "",
     subtext: scene.subtext || "",
     imageUrl: asset?.file_url || "",
-    durationInFrames: Math.round((scene.duration_ms / 1000) * FPS),
+    durationInFrames: sceneFrames,
     motionConfig,
     transition: mapTransition(scene.transition),
   };
