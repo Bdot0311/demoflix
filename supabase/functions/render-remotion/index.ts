@@ -167,13 +167,17 @@ serve(async (req) => {
 
     // Trigger Remotion Lambda renders
     const renderIds: Record<string, string> = {};
-    
+
+    const awsAccessKeyId = awsAccessKey;
+    const awsSecretAccessKey = awsSecretKey;
+
     for (const config of renderConfigs) {
       try {
-        // Call AWS Lambda directly using AWS Signature V4
         const lambdaPayload = {
           type: "start",
-          serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "https://remotionlambda-useast1-xxxxx.s3.amazonaws.com/sites/xxxxx/index.html",
+          serveUrl:
+            Deno.env.get("REMOTION_SERVE_URL") ||
+            "https://remotionlambda-useast1-xxxxx.s3.amazonaws.com/sites/xxxxx/index.html",
           composition: config.compositionId,
           inputProps: {
             ...inputProps,
@@ -188,28 +192,44 @@ serve(async (req) => {
           outName: `${projectId}-${config.id}.mp4`,
         };
 
-        // Use fetch with AWS Signature (simplified - in production use proper AWS SDK)
-        const lambdaUrl = `https://lambda.${awsRegion}.amazonaws.com/2015-03-31/functions/${functionName}/invocations`;
-        
-        const lambdaResponse = await fetch(lambdaUrl, {
+        const host = `lambda.${awsRegion}.amazonaws.com`;
+        const path = `/2015-03-31/functions/${functionName}/invocations`;
+        const lambdaUrl = `https://${host}${path}`;
+
+        const body = JSON.stringify(lambdaPayload);
+        const { amzDate, dateStamp } = getAwsDates();
+
+        const signed = await signAwsRequest({
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Amz-Date": new Date().toISOString().replace(/[:-]|\.\d{3}/g, ""),
-            // Note: In production, use proper AWS Signature V4 signing
-            // This is a placeholder - actual implementation requires aws4 signing
-          },
-          body: JSON.stringify(lambdaPayload),
+          host,
+          path,
+          region: awsRegion,
+          service: "lambda",
+          accessKeyId: awsAccessKeyId!,
+          secretAccessKey: awsSecretAccessKey!,
+          amzDate,
+          dateStamp,
+          body,
+          contentType: "application/json",
         });
 
-        if (lambdaResponse.ok) {
-          const result = await lambdaResponse.json();
-          renderIds[config.id] = result.renderId || `remotion-${config.id}-${Date.now()}`;
-          console.log(`Started Remotion render for ${config.id}:`, result);
-        } else {
-          console.error(`Failed to start ${config.id} render:`, await lambdaResponse.text());
-          // Continue with other formats
+        const lambdaResponse = await fetch(lambdaUrl, {
+          method: "POST",
+          headers: signed.headers,
+          body,
+        });
+
+        const responseText = await lambdaResponse.text();
+        if (!lambdaResponse.ok) {
+          console.error(`Failed to start ${config.id} render:`, responseText);
+          continue;
         }
+
+        const result = safeJsonParse(responseText) || {};
+        // Remotion Lambda typically returns a renderId; keep a fallback for safety.
+        renderIds[config.id] =
+          (result as any).renderId || (result as any).id || `remotion-${config.id}-${Date.now()}`;
+        console.log(`Started Remotion render for ${config.id}:`, result);
       } catch (err) {
         console.error(`Error starting ${config.id} render:`, err);
       }
@@ -263,6 +283,138 @@ serve(async (req) => {
   }
 });
 
+function safeJsonParse(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function getAwsDates() {
+  // AWS requires:
+  // - amzDate: YYYYMMDD'T'HHMMSS'Z'
+  // - dateStamp: YYYYMMDD
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = now.getUTCFullYear();
+  const mm = pad(now.getUTCMonth() + 1);
+  const dd = pad(now.getUTCDate());
+  const hh = pad(now.getUTCHours());
+  const mi = pad(now.getUTCMinutes());
+  const ss = pad(now.getUTCSeconds());
+  const dateStamp = `${yyyy}${mm}${dd}`;
+  const amzDate = `${dateStamp}T${hh}${mi}${ss}Z`;
+  return { amzDate, dateStamp };
+}
+
+async function sha256Hex(input: string) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return toHex(hash);
+}
+
+async function hmacSha256(key: ArrayBuffer, data: string) {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
+  return sig;
+}
+
+function toHex(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function getSignatureKey(params: {
+  secretAccessKey: string;
+  dateStamp: string;
+  region: string;
+  service: string;
+}) {
+  const kDate = await hmacSha256(
+    new TextEncoder().encode("AWS4" + params.secretAccessKey).buffer,
+    params.dateStamp
+  );
+  const kRegion = await hmacSha256(kDate, params.region);
+  const kService = await hmacSha256(kRegion, params.service);
+  const kSigning = await hmacSha256(kService, "aws4_request");
+  return kSigning;
+}
+
+async function signAwsRequest(params: {
+  method: "POST" | "GET";
+  host: string;
+  path: string;
+  region: string;
+  service: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  amzDate: string;
+  dateStamp: string;
+  body: string;
+  contentType: string;
+}) {
+  const payloadHash = await sha256Hex(params.body);
+
+  // Canonical headers must be lowercase and sorted.
+  const canonicalHeaders =
+    `content-type:${params.contentType}\n` +
+    `host:${params.host}\n` +
+    `x-amz-content-sha256:${payloadHash}\n` +
+    `x-amz-date:${params.amzDate}\n`;
+
+  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+
+  const canonicalRequest =
+    `${params.method}\n` +
+    `${params.path}\n` +
+    `\n` +
+    `${canonicalHeaders}\n` +
+    `${signedHeaders}\n` +
+    `${payloadHash}`;
+
+  const canonicalRequestHash = await sha256Hex(canonicalRequest);
+  const credentialScope = `${params.dateStamp}/${params.region}/${params.service}/aws4_request`;
+
+  const stringToSign =
+    `AWS4-HMAC-SHA256\n` +
+    `${params.amzDate}\n` +
+    `${credentialScope}\n` +
+    `${canonicalRequestHash}`;
+
+  const signingKey = await getSignatureKey({
+    secretAccessKey: params.secretAccessKey,
+    dateStamp: params.dateStamp,
+    region: params.region,
+    service: params.service,
+  });
+
+  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+
+  const authorizationHeader =
+    `AWS4-HMAC-SHA256 ` +
+    `Credential=${params.accessKeyId}/${credentialScope}, ` +
+    `SignedHeaders=${signedHeaders}, ` +
+    `Signature=${signature}`;
+
+  return {
+    headers: {
+      "Content-Type": params.contentType,
+      Host: params.host,
+      "X-Amz-Date": params.amzDate,
+      "X-Amz-Content-Sha256": payloadHash,
+      Authorization: authorizationHeader,
+    },
+  };
+}
 function mapTransition(transition?: string): string {
   switch (transition) {
     case "slide-left":
