@@ -112,8 +112,8 @@ const RenderPage = () => {
         
         // Send render IDs with the correct key for each status checker
         const body = renderer === "shotstack"
-          ? { renderId, shotstackRenderIds: renderIds }
-          : { renderId, remotionRenderIds: renderIds };
+          ? { renderId, shotstackRenderIds: renderIds, renderer }
+          : { renderId, remotionRenderIds: renderIds, renderer };
         
         const { data, error: fnError } = await supabase.functions.invoke(statusFunction, {
           body,
