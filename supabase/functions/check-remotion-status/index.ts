@@ -9,6 +9,7 @@ const corsHeaders = {
 interface StatusCheckRequest {
   renderId: string;
   remotionRenderIds: Record<string, string>;
+  renderer?: "remotion" | "remotion-dev" | "shotstack";
 }
 
 serve(async (req) => {
@@ -17,7 +18,7 @@ serve(async (req) => {
   }
 
   try {
-    const { renderId, remotionRenderIds }: StatusCheckRequest = await req.json();
+    const { renderId, remotionRenderIds, renderer }: StatusCheckRequest = await req.json();
 
     if (!renderId) {
       return new Response(
@@ -70,13 +71,18 @@ serve(async (req) => {
       );
     }
 
-    // Check if AWS Lambda is configured
+    // Check if we're in development mode
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY_ID");
     const awsSecretKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
     const functionName = Deno.env.get("REMOTION_FUNCTION_NAME");
+    
+    // Dev mode if: renderer says so, OR renderIds are dev IDs, OR AWS not configured
+    const isDevMode = renderer === "remotion-dev" 
+      || (remotionRenderIds && Object.values(remotionRenderIds).some(id => id.startsWith("dev-")))
+      || !awsAccessKey || !awsSecretKey || !functionName;
 
-    // DEVELOPMENT MODE: Fast progress simulation (30 seconds total)
-    if (!awsAccessKey || !awsSecretKey || !functionName) {
+    // DEVELOPMENT MODE: Fast progress simulation
+    if (isDevMode) {
       // Progress increment: 20% per call = ~5 calls to complete
       const progressIncrement = 20;
       const newProgress = Math.min(render.progress + progressIncrement, 100);
