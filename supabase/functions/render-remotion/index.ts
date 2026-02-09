@@ -222,10 +222,21 @@ serve(async (req) => {
         }
 
         const result = safeJsonParse(responseText) || {};
-        // Remotion Lambda typically returns a renderId; keep a fallback for safety.
-        renderIds[config.id] =
-          (result as any).renderId || (result as any).id || `remotion-${config.id}-${Date.now()}`;
         console.log(`Started Remotion render for ${config.id}:`, result);
+        
+        // Check if Lambda returned an error in the response body
+        if ((result as any).type === "error" || (result as any).errorType) {
+          console.error(`Lambda returned error for ${config.id}:`, (result as any).message || responseText);
+          continue;
+        }
+        
+        // Remotion Lambda typically returns a renderId
+        const remotionRenderId = (result as any).renderId || (result as any).id;
+        if (!remotionRenderId) {
+          console.error(`No renderId in Lambda response for ${config.id}`);
+          continue;
+        }
+        renderIds[config.id] = remotionRenderId;
       } catch (err) {
         console.error(`Error starting ${config.id} render:`, err);
       }
