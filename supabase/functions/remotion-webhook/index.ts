@@ -15,11 +15,11 @@ interface RemotionWebhookPayload {
     accruedSoFar: number;
     displayCost: string;
   };
-  // Custom metadata we passed
-  metadata?: {
+  // Remotion sends custom data in customData field
+  customData?: {
     projectId: string;
     dbRenderId: string;
-    format: "horizontal" | "vertical" | "square";
+    format: string;
   };
 }
 
@@ -30,22 +30,22 @@ serve(async (req) => {
 
   try {
     const payload: RemotionWebhookPayload = await req.json();
-    console.log("Remotion webhook received:", payload);
+    console.log("Remotion webhook received:", JSON.stringify(payload));
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { type, outputUrl, errors, metadata } = payload;
+    const { type, outputUrl, errors, customData } = payload;
 
-    if (!metadata?.dbRenderId) {
-      console.log("No dbRenderId in webhook, ignoring");
+    if (!customData?.dbRenderId) {
+      console.log("No dbRenderId in webhook payload, ignoring");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const { dbRenderId, format, projectId } = metadata;
+    const { dbRenderId, format, projectId } = customData;
 
     // Get current render state
     const { data: render } = await supabase
