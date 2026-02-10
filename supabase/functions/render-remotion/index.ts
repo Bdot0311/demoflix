@@ -166,12 +166,37 @@ serve(async (req) => {
 
     const awsAccessKeyId = awsAccessKey;
     const awsSecretAccessKey = awsSecretKey;
+    const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const remotionBucket = Deno.env.get("REMOTION_BUCKET_NAME") || "remotionlambda-useast1-kio865im8w";
 
     for (const config of renderConfigs) {
       try {
-        const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
-        const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
-        const remotionBucket = Deno.env.get("REMOTION_BUCKET_NAME") || "remotionlambda-useast1-kio865im8w";
+        // Pre-serialize inputProps to S3 so chunk workers can read them
+        const propsWithDimensions = {
+          ...inputProps,
+          width: config.width,
+          height: config.height,
+        };
+        const propsJson = JSON.stringify(propsWithDimensions);
+        const propsKey = `input-props/${projectId}/${config.id}-${Date.now()}.json`;
+
+        // Upload props to S3
+        const uploadSuccess = await uploadToS3({
+          bucket: remotionBucket,
+          key: propsKey,
+          body: propsJson,
+          contentType: "application/json",
+          region: awsRegion,
+          accessKeyId: awsAccessKeyId!,
+          secretAccessKey: awsSecretAccessKey!,
+        });
+
+        if (!uploadSuccess) {
+          console.error(`Failed to upload input props for ${config.id}`);
+          continue;
+        }
+
         const lambdaPayload = {
           type: "start",
           version: remotionVersion,
@@ -180,11 +205,7 @@ serve(async (req) => {
             "https://remotionlambda-useast1-xxxxx.s3.amazonaws.com/sites/xxxxx/index.html",
           composition: config.compositionId,
           forceBucketName: remotionBucket,
-          inputProps: {
-            ...inputProps,
-            width: config.width,
-            height: config.height,
-          },
+          inputProps: propsWithDimensions,
           codec: "h264",
           imageFormat: "jpeg",
           maxRetries: 2,
@@ -370,7 +391,7 @@ async function getSignatureKey(params: {
 }
 
 async function signAwsRequest(params: {
-  method: "POST" | "GET";
+  method: "POST" | "GET" | "PUT";
   host: string;
   path: string;
   region: string;
@@ -452,5 +473,55 @@ function mapTransition(transition?: string): string {
       return "zoom";
     default:
       return "fade";
+  }
+}
+
+async function uploadToS3(params: {
+  bucket: string;
+  key: string;
+  body: string;
+  contentType: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+}): Promise<boolean> {
+  try {
+    const host = `${params.bucket}.s3.${params.region}.amazonaws.com`;
+    const path = `/${params.key}`;
+    const url = `https://${host}${path}`;
+
+    const { amzDate, dateStamp } = getAwsDates();
+
+    const signed = await signAwsRequest({
+      method: "PUT" as any,
+      host,
+      path,
+      region: params.region,
+      service: "s3",
+      accessKeyId: params.accessKeyId,
+      secretAccessKey: params.secretAccessKey,
+      amzDate,
+      dateStamp,
+      body: params.body,
+      contentType: params.contentType,
+    });
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: signed.headers,
+      body: params.body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(`S3 upload failed for ${params.key}:`, text);
+      return false;
+    }
+
+    console.log(`Uploaded input props to s3://${params.bucket}/${params.key}`);
+    return true;
+  } catch (err) {
+    console.error("S3 upload error:", err);
+    return false;
   }
 }
