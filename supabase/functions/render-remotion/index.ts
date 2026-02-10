@@ -169,8 +169,10 @@ serve(async (req) => {
 
     for (const config of renderConfigs) {
       try {
+        const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
         const lambdaPayload = {
           type: "start",
+          version: remotionVersion,
           serveUrl:
             Deno.env.get("REMOTION_SERVE_URL") ||
             "https://remotionlambda-useast1-xxxxx.s3.amazonaws.com/sites/xxxxx/index.html",
