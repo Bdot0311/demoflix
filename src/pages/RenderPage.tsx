@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ const processingMessages = [
 const RenderPage = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quality = (searchParams.get("quality") as "draft" | "standard" | "high") || "standard";
   const { toast } = useToast();
   const [progress, setProgress] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
@@ -73,7 +75,7 @@ const RenderPage = () => {
 
       // Start the actual render - try Remotion first, falls back to Shotstack
       const { data, error: fnError } = await supabase.functions.invoke("render-remotion", {
-        body: { projectId, renderId: render.id },
+        body: { projectId, renderId: render.id, quality },
       });
 
       if (fnError) throw fnError;
@@ -253,7 +255,7 @@ const RenderPage = () => {
         {/* Tips */}
         <div className="mt-12 p-6 rounded-2xl bg-card/50 border border-border/50">
           <p className="text-sm text-muted-foreground">
-            <span className="text-foreground font-medium">Creating 3 formats:</span> Horizontal (16:9), Vertical (9:16), and Square (1:1) for all your social platforms.
+            <span className="text-foreground font-medium">Quality: {quality.charAt(0).toUpperCase() + quality.slice(1)}</span> · Creating 3 formats: Horizontal (16:9), Vertical (9:16), and Square (1:1) for all your social platforms.
           </p>
         </div>
       </div>

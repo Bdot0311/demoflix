@@ -81,6 +81,7 @@ import { MusicSelector } from "@/components/editor/MusicSelector";
 import { BrandingPanel } from "@/components/editor/BrandingPanel";
 import { VoiceoverPanel } from "@/components/editor/VoiceoverPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { QualityPresetSelector, type QualityPreset } from "@/components/editor/QualityPresetSelector";
 
 // Motion config type for use in components
 interface MotionConfigType {
@@ -235,6 +236,7 @@ const Editor = () => {
   const [useRemotionPreview, setUseRemotionPreview] = useState(true);
   const [voiceoverUrl, setVoiceoverUrl] = useState<string | null>(null);
   const [voiceoverEnabled, setVoiceoverEnabled] = useState(false);
+  const [qualityPreset, setQualityPreset] = useState<QualityPreset>("standard");
 
   // History for undo/redo
   const {
@@ -686,7 +688,7 @@ const Editor = () => {
       .update({ status: "rendering" })
       .eq("id", project.id);
 
-    navigate(`/render/${project.id}`);
+    navigate(`/render/${project.id}?quality=${qualityPreset}`);
   };
 
   const handleAIGenerate = async () => {
@@ -1247,10 +1249,23 @@ const Editor = () => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={handleGenerate} className="bg-primary hover:bg-primary/90 glow-sm">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Generate Trailer
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button onClick={handleGenerate} className="bg-primary hover:bg-primary/90 glow-sm">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Trailer
+                  <ChevronDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 bg-card border-border z-50 p-4">
+                <DropdownMenuLabel className="px-0 pb-2">Render Quality</DropdownMenuLabel>
+                <QualityPresetSelector value={qualityPreset} onChange={setQualityPreset} />
+                <Button onClick={handleGenerate} className="w-full mt-3 bg-primary hover:bg-primary/90">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate Trailer
+                </Button>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile/Tablet actions */}
