@@ -25,6 +25,7 @@ interface RenderRequest {
   projectId: string;
   renderId: string;
   format?: "horizontal" | "vertical" | "square" | "all";
+  quality?: "draft" | "standard" | "high";
 }
 
 serve(async (req) => {
@@ -33,7 +34,7 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId, renderId, format = "all" }: RenderRequest = await req.json();
+    const { projectId, renderId, format = "all", quality = "standard" }: RenderRequest = await req.json();
 
     if (!projectId || !renderId) {
       return new Response(
@@ -143,17 +144,24 @@ serve(async (req) => {
       fps: 30,
     };
 
+    // Quality presets: resolution & codec settings
+    const qualitySettings = {
+      draft:    { scale: 0.5, crf: 28, jpegQuality: 60, framesPerLambda: 60 },
+      standard: { scale: 1.0, crf: 18, jpegQuality: 80, framesPerLambda: 40 },
+      high:     { scale: 1.0, crf: 12, jpegQuality: 95, framesPerLambda: 20 },
+    }[quality];
+
     // Define render configurations
     const renderConfigs: { id: string; width: number; height: number; compositionId: string }[] = [];
     
     if (format === "all" || format === "horizontal") {
-      renderConfigs.push({ id: "horizontal", width: 1920, height: 1080, compositionId: "DemoTrailer" });
+      renderConfigs.push({ id: "horizontal", width: Math.round(1920 * qualitySettings.scale), height: Math.round(1080 * qualitySettings.scale), compositionId: "DemoTrailer" });
     }
     if (format === "all" || format === "vertical") {
-      renderConfigs.push({ id: "vertical", width: 1080, height: 1920, compositionId: "DemoTrailerVertical" });
+      renderConfigs.push({ id: "vertical", width: Math.round(1080 * qualitySettings.scale), height: Math.round(1920 * qualitySettings.scale), compositionId: "DemoTrailerVertical" });
     }
     if (format === "all" || format === "square") {
-      renderConfigs.push({ id: "square", width: 1080, height: 1080, compositionId: "DemoTrailerSquare" });
+      renderConfigs.push({ id: "square", width: Math.round(1080 * qualitySettings.scale), height: Math.round(1080 * qualitySettings.scale), compositionId: "DemoTrailerSquare" });
     }
 
     // Calculate total duration
@@ -208,9 +216,11 @@ serve(async (req) => {
           inputProps: propsWithDimensions,
           codec: "h264",
           imageFormat: "jpeg",
-          maxRetries: 2,
+          jpegQuality: qualitySettings.jpegQuality,
+          crf: qualitySettings.crf,
+          maxRetries: quality === "draft" ? 1 : 2,
           privacy: "public",
-          framesPerLambda: 40,
+          framesPerLambda: qualitySettings.framesPerLambda,
           outName: `${projectId}-${config.id}.mp4`,
           webhook: {
             url: webhookUrl,
