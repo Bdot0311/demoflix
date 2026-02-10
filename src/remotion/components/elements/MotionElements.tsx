@@ -44,7 +44,6 @@ export const StatCounter: React.FC<StatCounterProps> = ({
         textAlign: "center",
         transform: `scale(${scale}) translateY(${y}px)`,
         opacity: progress,
-        willChange: "transform, opacity",
       }}
     >
       <div
@@ -112,9 +111,7 @@ export const FeatureCard: React.FC<FeatureCardProps> = ({
         border: `1px solid rgba(255, 255, 255, 0.1)`,
         transform: `scale(${scale}) translateY(${y}px)`,
         opacity: progress,
-        backdropFilter: "blur(20px)",
         maxWidth: 400,
-        willChange: "transform, opacity",
       }}
     >
       {/* Icon placeholder */}
@@ -297,7 +294,6 @@ export const CTAButton: React.FC<CTAButtonProps> = ({
       style={{
         transform: `scale(${scale}) translateY(${y}px)`,
         opacity: progress,
-        willChange: "transform, opacity",
       }}
     >
       <div
@@ -350,7 +346,6 @@ export const AnimatedIcon: React.FC<AnimatedIconProps> = ({
         fontSize: size,
         transform: `scale(${scale}) rotate(${rotate}deg)`,
         opacity: progress,
-        willChange: "transform, opacity",
       }}
     >
       {emoji}

@@ -48,17 +48,9 @@ interface FilmGrainProps {
 }
 
 export const FilmGrain: React.FC<FilmGrainProps> = ({ intensity = 0.03 }) => {
-  // Static grain - no frame-based updates for performance
-  const style = useMemo(() => ({
-    position: "absolute" as const,
-    inset: 0,
-    pointerEvents: "none" as const,
-    mixBlendMode: "overlay" as const,
-    opacity: intensity,
-    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' seed='42' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
-  }), [intensity]);
-
-  return <div style={style} />;
+  // Render nothing — film grain is purely cosmetic and very expensive on Lambda
+  // The SVG filter + full-screen overlay consumes significant memory during rendering
+  return null;
 };
 
 // SIMPLIFIED Accent line - faster animation

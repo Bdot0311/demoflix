@@ -187,9 +187,9 @@ serve(async (req) => {
           },
           codec: "h264",
           imageFormat: "jpeg",
-          maxRetries: 1,
+          maxRetries: 2,
           privacy: "public",
-          framesPerLambda: 20,
+          framesPerLambda: 40,
           outName: `${projectId}-${config.id}.mp4`,
           webhook: {
             url: webhookUrl,
