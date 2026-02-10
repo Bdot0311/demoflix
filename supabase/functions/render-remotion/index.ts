@@ -171,6 +171,7 @@ serve(async (req) => {
       try {
         const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
         const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+        const remotionBucket = Deno.env.get("REMOTION_BUCKET_NAME") || "remotionlambda-useast1-kio865im8w";
         const lambdaPayload = {
           type: "start",
           version: remotionVersion,
@@ -178,6 +179,7 @@ serve(async (req) => {
             Deno.env.get("REMOTION_SERVE_URL") ||
             "https://remotionlambda-useast1-xxxxx.s3.amazonaws.com/sites/xxxxx/index.html",
           composition: config.compositionId,
+          forceBucketName: remotionBucket,
           inputProps: {
             ...inputProps,
             width: config.width,
@@ -187,7 +189,7 @@ serve(async (req) => {
           imageFormat: "jpeg",
           maxRetries: 1,
           privacy: "public",
-          framesPerLambda: 10,
+          framesPerLambda: 20,
           outName: `${projectId}-${config.id}.mp4`,
           webhook: {
             url: webhookUrl,
