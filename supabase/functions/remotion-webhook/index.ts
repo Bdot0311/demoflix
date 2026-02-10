@@ -112,13 +112,16 @@ serve(async (req) => {
         console.log("All renders complete for:", dbRenderId);
       }
     } else if (type === "error" || type === "timeout") {
-      const errorMessage = errors?.join(", ") || `Render ${type}`;
+      // errors can be strings or objects with a message field
+      const errorMessage = errors
+        ?.map((e: any) => typeof e === "string" ? e : e?.message || JSON.stringify(e))
+        .join(", ") || `Render ${type}`;
       
       await supabase
         .from("renders")
         .update({
           status: "failed",
-          error_message: `${format}: ${errorMessage}`,
+          error_message: `${format}: ${errorMessage}`.substring(0, 500),
         })
         .eq("id", dbRenderId);
 
