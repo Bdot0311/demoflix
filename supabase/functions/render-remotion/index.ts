@@ -170,6 +170,7 @@ serve(async (req) => {
     for (const config of renderConfigs) {
       try {
         const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
+        const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
         const lambdaPayload = {
           type: "start",
           version: remotionVersion,
@@ -188,6 +189,14 @@ serve(async (req) => {
           privacy: "public",
           framesPerLambda: 10,
           outName: `${projectId}-${config.id}.mp4`,
+          webhook: {
+            url: webhookUrl,
+            customData: {
+              projectId,
+              dbRenderId: renderId,
+              format: config.id,
+            },
+          },
         };
 
         const host = `lambda.${awsRegion}.amazonaws.com`;
