@@ -20,18 +20,16 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({
     ? angle + interpolate(frame, [0, durationInFrames], [0, 30], { extrapolateRight: "clamp" })
     : angle;
 
-  const gradient = `linear-gradient(${animatedAngle}deg, ${colors.join(", ")})`;
-
   return (
     <AbsoluteFill
       style={{
-        background: gradient,
-        willChange: "background",
+        background: `linear-gradient(${animatedAngle}deg, ${colors.join(", ")})`,
       }}
     />
   );
 };
 
+// Lightweight particle field — reduced count, no willChange
 interface ParticleFieldProps {
   count?: number;
   color?: string;
@@ -41,14 +39,13 @@ interface ParticleFieldProps {
 }
 
 export const ParticleField: React.FC<ParticleFieldProps> = ({
-  count = 50,
+  count = 20,
   color = "rgba(139, 92, 246, 0.3)",
   minSize = 2,
-  maxSize = 6,
+  maxSize = 5,
   speed = 0.5,
 }) => {
   const frame = useCurrentFrame();
-  const { width, height } = useVideoConfig();
 
   const particles = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
@@ -79,7 +76,6 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({
               borderRadius: "50%",
               backgroundColor: color,
               opacity: particle.opacity,
-              willChange: "transform",
             }}
           />
         );
@@ -88,6 +84,7 @@ export const ParticleField: React.FC<ParticleFieldProps> = ({
   );
 };
 
+// Simplified glow orbs — uses opacity instead of blur filter
 interface GlowOrbsProps {
   count?: number;
   colors?: string[];
@@ -132,10 +129,8 @@ export const GlowOrbs: React.FC<GlowOrbsProps> = ({
               width: orb.size,
               height: orb.size,
               borderRadius: "50%",
-              background: `radial-gradient(circle, ${orb.color}40 0%, transparent 70%)`,
-              filter: "blur(40px)",
+              background: `radial-gradient(circle, ${orb.color}30 0%, transparent 70%)`,
               transform: "translate(-50%, -50%)",
-              willChange: "transform",
             }}
           />
         );
@@ -169,7 +164,7 @@ export const GridLines: React.FC<GridLinesProps> = ({
   );
 };
 
-// Combined animated background with all effects
+// Combined animated background — "full" mode now skips particles for Lambda perf
 interface AnimatedBackgroundProps {
   type?: "gradient" | "particles" | "grid" | "orbs" | "full";
   colors?: string[];
@@ -189,10 +184,10 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({
         <GradientBackground colors={gradientColors} />
       )}
       {(type === "orbs" || type === "full") && (
-        <GlowOrbs colors={[brandColor, "#06B6D4", "#F59E0B"]} />
+        <GlowOrbs colors={[brandColor, "#06B6D4", "#F59E0B"]} count={2} />
       )}
-      {(type === "particles" || type === "full") && (
-        <ParticleField color={`${brandColor}40`} count={40} />
+      {type === "particles" && (
+        <ParticleField color={`${brandColor}40`} count={15} />
       )}
       {(type === "grid" || type === "full") && (
         <GridLines color={brandColor} opacity={0.03} />

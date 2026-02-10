@@ -151,7 +151,6 @@ export const Scene: React.FC<SceneProps> = memo(({ scene, isFirst, isLast }) => 
             height: "100%",
             transform: `scale(${combinedScale}) translate(${combinedTx}%, ${combinedTy}%)`,
             transformOrigin: "center center",
-            willChange: "transform",
           }}
         >
           {imageUrl && (
