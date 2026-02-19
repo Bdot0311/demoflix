@@ -211,6 +211,9 @@ serve(async (req) => {
     const awsAccessKeyId = awsAccessKey;
     const awsSecretAccessKey = awsSecretKey;
     const remotionVersion = Deno.env.get("REMOTION_VERSION") || "4.0.417";
+    if (!Deno.env.get("REMOTION_VERSION")) {
+      console.log("REMOTION_VERSION not set, defaulting to 4.0.417");
+    }
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     const remotionBucket = Deno.env.get("REMOTION_BUCKET_NAME") || "remotionlambda-useast1-kio865im8w";
 
