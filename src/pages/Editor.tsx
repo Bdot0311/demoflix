@@ -688,7 +688,7 @@ const Editor = () => {
       .update({ status: "rendering" })
       .eq("id", project.id);
 
-    navigate(`/render/${project.id}?quality=${qualityPreset}&renderer=remotion-dev`);
+    navigate(`/render/${project.id}?quality=${qualityPreset}&renderer=remotion`);
   };
 
   const handleAIGenerate = async () => {
