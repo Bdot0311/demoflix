@@ -30,7 +30,8 @@ const RenderPage = () => {
   const [project, setProject] = useState<any>(null);
   const [renderId, setRenderId] = useState<string | null>(null);
   const [renderIds, setRenderIds] = useState<Record<string, string> | null>(null);
-  const [renderer, setRenderer] = useState<"remotion" | "shotstack" | "remotion-dev">("remotion");
+  const rendererParam = (searchParams.get("renderer") as "remotion" | "shotstack" | "remotion-dev") || "remotion";
+  const [renderer, setRenderer] = useState<"remotion" | "shotstack" | "remotion-dev">(rendererParam);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
 
@@ -75,7 +76,7 @@ const RenderPage = () => {
 
       // Start the actual render - try Remotion first, falls back to Shotstack
       const { data, error: fnError } = await supabase.functions.invoke("render-remotion", {
-        body: { projectId, renderId: render.id, quality },
+        body: { projectId, renderId: render.id, quality, renderer: rendererParam },
       });
 
       if (fnError) throw fnError;
