@@ -30,8 +30,8 @@ const RenderPage = () => {
   const [project, setProject] = useState<any>(null);
   const [renderId, setRenderId] = useState<string | null>(null);
   const [renderIds, setRenderIds] = useState<Record<string, string> | null>(null);
-  const rendererParam = (searchParams.get("renderer") as "remotion" | "shotstack" | "remotion-dev") || "remotion";
-  const [renderer, setRenderer] = useState<"remotion" | "shotstack" | "remotion-dev">(rendererParam);
+  const rendererParam = (searchParams.get("renderer") as "remotion" | "remotion-dev") || "remotion";
+  const [renderer, setRenderer] = useState<"remotion" | "remotion-dev">(rendererParam);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
 
@@ -108,15 +108,8 @@ const RenderPage = () => {
 
     const checkStatus = async () => {
       try {
-        // Use the appropriate status checker based on renderer
-        const statusFunction = renderer === "shotstack" 
-          ? "check-render-status" 
-          : "check-remotion-status";
-        
-        // Send render IDs with the correct key for each status checker
-        const body = renderer === "shotstack"
-          ? { renderId, shotstackRenderIds: renderIds, renderer }
-          : { renderId, remotionRenderIds: renderIds, renderer };
+        const statusFunction = "check-remotion-status";
+        const body = { renderId, remotionRenderIds: renderIds, renderer };
         
         const { data, error: fnError } = await supabase.functions.invoke(statusFunction, {
           body,

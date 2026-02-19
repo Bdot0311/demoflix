@@ -164,21 +164,23 @@ serve(async (req) => {
 
     // If AWS is not configured, fall back to Shotstack
     if (!awsAccessKey || !awsSecretKey || !functionName) {
-      console.log("Remotion Lambda not configured, falling back to Shotstack");
+      console.error("Remotion Lambda not configured: missing AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, or REMOTION_FUNCTION_NAME");
       
-      // Call the legacy render-video function
-      const response = await fetch(`${supabaseUrl}/functions/v1/render-video`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": req.headers.get("Authorization") || "",
-        },
-        body: JSON.stringify({ projectId, renderId }),
-      });
+      // Fall back to dev simulation mode
+      await supabase
+        .from("renders")
+        .update({ status: "processing", progress: 10 })
+        .eq("id", renderId);
 
-      const data = await response.json();
       return new Response(
-        JSON.stringify({ ...data, renderer: "shotstack" }),
+        JSON.stringify({
+          success: true,
+          renderer: "remotion-dev",
+          renderIds: {
+            horizontal: `dev-horizontal-${Date.now()}`,
+          },
+          message: "Remotion Lambda not configured. Using development simulation mode.",
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -214,30 +216,11 @@ serve(async (req) => {
 
     for (const config of renderConfigs) {
       try {
-        // Pre-serialize inputProps to S3 so chunk workers can read them
         const propsWithDimensions = {
           ...inputProps,
           width: config.width,
           height: config.height,
         };
-        const propsJson = JSON.stringify(propsWithDimensions);
-        const propsKey = `input-props/${projectId}/${config.id}-${Date.now()}.json`;
-
-        // Upload props to S3
-        const uploadSuccess = await uploadToS3({
-          bucket: remotionBucket,
-          key: propsKey,
-          body: propsJson,
-          contentType: "application/json",
-          region: awsRegion,
-          accessKeyId: awsAccessKeyId!,
-          secretAccessKey: awsSecretAccessKey!,
-        });
-
-        if (!uploadSuccess) {
-          console.error(`Failed to upload input props for ${config.id}`);
-          continue;
-        }
 
         const lambdaPayload = {
           type: "start",
