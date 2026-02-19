@@ -228,22 +228,70 @@ serve(async (req) => {
           height: config.height,
         };
 
+        // Serialize inputProps using Remotion's expected format
+        // For small payloads: { type: "payload", payload: "<json>" }
+        // For large payloads (>~195KB): upload to S3 as { type: "bucket-url", hash, bucketName }
+        const propsJson = JSON.stringify(propsWithDimensions);
+        const propsSize = new TextEncoder().encode(propsJson).length;
+        const MAX_INLINE_SIZE = 195_000; // ~195KB threshold for video renders
+
+        let serializedInputProps: Record<string, any>;
+
+        if (propsSize > MAX_INLINE_SIZE) {
+          const propsHash = await sha256Hex(propsJson);
+          const propsS3Key = `input-props/${propsHash}.json`;
+
+          await uploadToS3({
+            bucket: remotionBucket,
+            key: propsS3Key,
+            body: propsJson,
+            contentType: "application/json",
+            region: awsRegion,
+            accessKeyId: awsAccessKeyId!,
+            secretAccessKey: awsSecretAccessKey!,
+          });
+
+          console.log(`Serialized inputProps to S3: ${propsS3Key} (${propsSize} bytes)`);
+          serializedInputProps = {
+            type: "bucket-url",
+            hash: propsHash,
+            bucketName: remotionBucket,
+          };
+        } else {
+          console.log(`Passing inputProps inline (${propsSize} bytes)`);
+          serializedInputProps = {
+            type: "payload",
+            payload: propsJson,
+          };
+        }
+
+        const serveUrl = Deno.env.get("REMOTION_SERVE_URL") || DEFAULT_SERVE_URL;
+        console.log(`Using serveUrl: ${serveUrl}`);
+
         const lambdaPayload = {
           type: "start",
           version: remotionVersion,
-          serveUrl:
-            Deno.env.get("REMOTION_SERVE_URL") ||
-            DEFAULT_SERVE_URL,
+          serveUrl,
           composition: config.compositionId,
-          forceBucketName: remotionBucket,
-          inputProps: propsWithDimensions,
+          bucketName: remotionBucket,
+          inputProps: serializedInputProps,
           codec: "h264",
           imageFormat: "jpeg",
           jpegQuality: qualitySettings.jpegQuality,
           crf: qualitySettings.crf,
           maxRetries: quality === "draft" ? 1 : 2,
           privacy: "public",
+          logLevel: "info",
           framesPerLambda: qualitySettings.framesPerLambda,
+          concurrencyPerLambda: 1,
+          muted: false,
+          overwrite: true,
+          forcePathStyle: false,
+          envVariables: {},
+          metadata: {},
+          chromiumOptions: {},
+          scale: qualitySettings.scale,
+          timeoutInMilliseconds: 120000,
           outName: `${projectId}-${config.id}.mp4`,
           webhook: {
             url: webhookUrl,
