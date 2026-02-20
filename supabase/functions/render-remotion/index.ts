@@ -30,50 +30,7 @@ interface RenderRequest {
 }
 
 const DEFAULT_SERVE_URL =
-  "https://remotionlambda-useast1-kio865im8w.s3.us-east-1.amazonaws.com/sites/saas-demo-generator/index.html";
-
-const buildRecreateInput = (project: any, scenes: any[]) => {
-  const projectName = project?.name || "Demo";
-  const brandPrimary = project?.brand_color || "#7B38D9";
-  const mappedScenes = (scenes || [])
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((scene, idx) => ({
-      id: scene.id,
-      title: scene.headline || `Scene ${idx + 1}`,
-      body: scene.subtext || "",
-      duration: Math.max(3, Math.round((scene.duration_ms || 3000) / 1000)),
-      layout: "feature-glass",
-    }));
-
-  return {
-    title: `${projectName} Demo`,
-    brand: {
-      name: projectName,
-      primary: brandPrimary,
-      secondary: project?.brand_color_secondary || "#FFFFFF",
-      background: "#F7F8FB",
-      fontFamily: "\"Space Grotesk\", \"Manrope\", system-ui",
-      logoUrl: project?.logo_url || undefined,
-    },
-    scenes: [
-      {
-        id: "hook",
-        title: projectName,
-        body: project?.description || "Cinematic product demo",
-        duration: 4,
-        layout: "feature-glass",
-      },
-      ...mappedScenes,
-      {
-        id: "cta",
-        title: "Start Free Trial",
-        body: "Turn conversations into demos.",
-        duration: 4,
-        layout: "cta",
-      },
-    ],
-  };
-};
+  "https://remotionlambda-useast1-kio865im8w.s3.us-east-1.amazonaws.com/sites/demoflix/index.html";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -127,35 +84,6 @@ serve(async (req) => {
       .update({ status: "processing", started_at: new Date().toISOString(), progress: 5 })
       .eq("id", renderId);
 
-    // Optional local renderer (dev) to use a custom render service
-    const localRenderUrl = Deno.env.get("LOCAL_RENDER_URL");
-    if (renderer === "remotion-dev" && localRenderUrl) {
-      const input = buildRecreateInput(project, scenes);
-      const localResponse = await fetch(`${localRenderUrl}/api/recreate/render`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input, jobId: renderId }),
-      });
-      const localData = await localResponse.json();
-      const videoPath = localData.url || localData.path;
-      const finalUrl = videoPath?.startsWith("http") ? videoPath : `${localRenderUrl}${videoPath}`;
-
-      await supabase
-        .from("renders")
-        .update({
-          status: "completed",
-          progress: 100,
-          video_url: finalUrl,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", renderId);
-
-      return new Response(
-        JSON.stringify({ renderer: "remotion-dev", renderIds: { horizontal: `local-${renderId}` }, url: finalUrl }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Check for required AWS secrets
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY_ID");
     const awsSecretKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
@@ -185,10 +113,44 @@ serve(async (req) => {
       );
     }
 
-    // Build input props for saas-demo-generator recreate composition
-    const inputProps = buildRecreateInput(project, scenes);
+    // Build input props for DemoFlix compositions
+    const inputProps = {
+      scenes: scenes.map((scene: any) => {
+        const storedMotionConfig = scene.motion_config || {};
+        const motionConfig = {
+          animation_style: storedMotionConfig.animation_style || "fade-scale",
+          spring: storedMotionConfig.spring || { damping: 30, mass: 0.5, stiffness: 300, overshootClamping: true },
+          stagger_delay_frames: 0,
+          entrance_delay_frames: storedMotionConfig.entrance_delay_frames || 3,
+          effects: storedMotionConfig.effects || ["vignette"],
+          camera: {
+            zoom_start: storedMotionConfig.camera?.zoom_start ?? 1.0,
+            zoom_end: Math.min(scene.zoom_level || storedMotionConfig.camera?.zoom_end || 1.15, 1.5),
+            pan_x: scene.pan_x ?? storedMotionConfig.camera?.pan_x ?? 0,
+            pan_y: scene.pan_y ?? storedMotionConfig.camera?.pan_y ?? 0,
+          },
+        };
 
-    // Quality presets: resolution & codec settings
+        return {
+          id: scene.id,
+          headline: scene.headline || "",
+          subtext: scene.subtext || "",
+          imageUrl: scene.asset?.file_url || "",
+          durationInFrames: Math.round((scene.duration_ms / 1000) * 30),
+          motionConfig,
+          transition: mapTransition(scene.transition),
+        };
+      }),
+      width: 1920,
+      height: 1080,
+      fps: 30,
+      brandColor: project.brand_color || "#8B5CF6",
+      logoUrl: project.logo_url || undefined,
+      isMotionGraphics: false,
+      motionGraphicsScenes: undefined,
+    };
+
+// Quality presets: resolution & codec settings
     const qualitySettings = {
       draft:    { scale: 0.5, crf: 28, jpegQuality: 60, framesPerLambda: 60 },
       standard: { scale: 1.0, crf: 18, jpegQuality: 80, framesPerLambda: 40 },
@@ -196,11 +158,19 @@ serve(async (req) => {
     }[quality];
 
     // Define render configurations
-    const renderConfigs: { id: string; width: number; height: number; compositionId: string }[] = [
-      { id: "horizontal", width: Math.round(1920 * qualitySettings.scale), height: Math.round(1080 * qualitySettings.scale), compositionId: "recreate-16-9" },
-    ];
+    const renderConfigs: { id: string; width: number; height: number; compositionId: string }[] = [];
+    
+    if (format === "all" || format === "horizontal") {
+      renderConfigs.push({ id: "horizontal", width: Math.round(1920 * qualitySettings.scale), height: Math.round(1080 * qualitySettings.scale), compositionId: "DemoTrailer" });
+    }
+    if (format === "all" || format === "vertical") {
+      renderConfigs.push({ id: "vertical", width: Math.round(1080 * qualitySettings.scale), height: Math.round(1920 * qualitySettings.scale), compositionId: "DemoTrailerVertical" });
+    }
+    if (format === "all" || format === "square") {
+      renderConfigs.push({ id: "square", width: Math.round(1080 * qualitySettings.scale), height: Math.round(1080 * qualitySettings.scale), compositionId: "DemoTrailerSquare" });
+    }
 
-    // Calculate total duration
+// Calculate total duration
     const totalFrames = scenes.reduce((sum: number, scene: Scene) => 
       sum + Math.round((scene.duration_ms / 1000) * 30), 0
     );
@@ -228,70 +198,22 @@ serve(async (req) => {
           height: config.height,
         };
 
-        // Serialize inputProps using Remotion's expected format
-        // For small payloads: { type: "payload", payload: "<json>" }
-        // For large payloads (>~195KB): upload to S3 as { type: "bucket-url", hash, bucketName }
-        const propsJson = JSON.stringify(propsWithDimensions);
-        const propsSize = new TextEncoder().encode(propsJson).length;
-        const MAX_INLINE_SIZE = 195_000; // ~195KB threshold for video renders
-
-        let serializedInputProps: Record<string, any>;
-
-        if (propsSize > MAX_INLINE_SIZE) {
-          const propsHash = await sha256Hex(propsJson);
-          const propsS3Key = `input-props/${propsHash}.json`;
-
-          await uploadToS3({
-            bucket: remotionBucket,
-            key: propsS3Key,
-            body: propsJson,
-            contentType: "application/json",
-            region: awsRegion,
-            accessKeyId: awsAccessKeyId!,
-            secretAccessKey: awsSecretAccessKey!,
-          });
-
-          console.log(`Serialized inputProps to S3: ${propsS3Key} (${propsSize} bytes)`);
-          serializedInputProps = {
-            type: "bucket-url",
-            hash: propsHash,
-            bucketName: remotionBucket,
-          };
-        } else {
-          console.log(`Passing inputProps inline (${propsSize} bytes)`);
-          serializedInputProps = {
-            type: "payload",
-            payload: propsJson,
-          };
-        }
-
-        const serveUrl = Deno.env.get("REMOTION_SERVE_URL") || DEFAULT_SERVE_URL;
-        console.log(`Using serveUrl: ${serveUrl}`);
-
         const lambdaPayload = {
           type: "start",
           version: remotionVersion,
-          serveUrl,
+          serveUrl:
+            Deno.env.get("REMOTION_SERVE_URL") ||
+            DEFAULT_SERVE_URL,
           composition: config.compositionId,
-          bucketName: remotionBucket,
-          inputProps: serializedInputProps,
+          forceBucketName: remotionBucket,
+          inputProps: propsWithDimensions,
           codec: "h264",
           imageFormat: "jpeg",
           jpegQuality: qualitySettings.jpegQuality,
           crf: qualitySettings.crf,
           maxRetries: quality === "draft" ? 1 : 2,
           privacy: "public",
-          logLevel: "info",
           framesPerLambda: qualitySettings.framesPerLambda,
-          concurrencyPerLambda: 1,
-          muted: false,
-          overwrite: true,
-          forcePathStyle: false,
-          envVariables: {},
-          metadata: {},
-          chromiumOptions: {},
-          scale: qualitySettings.scale,
-          timeoutInMilliseconds: 120000,
           outName: `${projectId}-${config.id}.mp4`,
           webhook: {
             url: webhookUrl,
